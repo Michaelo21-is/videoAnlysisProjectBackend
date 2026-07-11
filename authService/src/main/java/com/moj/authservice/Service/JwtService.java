@@ -86,55 +86,9 @@ public class JwtService {
         jwtRepository.save(jwtToken);
     }
 
-    public String extractTokenFromRequest(HttpServletRequest request, TokenType tokenType) {
-        String token;
 
-        if (tokenType == TokenType.ACCESS) {
-            token = request.getHeader("accessToken");
-            if (token == null || token.isBlank()) {
-                return null;
-            }
-            token = token.replace("Bearer ", "");
-        } else if (tokenType == TokenType.TEMPORARY) {
-            token = request.getHeader("tempToken");
-            if (token == null || token.isBlank()) {
-                throw new IllegalArgumentException("Temp token not found in request headers");
-            }
-        } else if (tokenType == TokenType.REFRESH) {
-            token = request.getHeader("refreshToken");
-            if (token == null || token.isBlank()) {
-                throw new IllegalArgumentException("Access token not found in request headers");
-            }
-            token = token.replace("Bearer ", "");
-        }
-        else{throw new IllegalArgumentException("Unsupported token type");}
 
-        return token;
-    }
 
-    private Claims extractAllClaims(String token) {
-        return Jwts
-                .parser()
-                .verifyWith(getSignInKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-
-    }
-
-    public UUID getUserIdFromAccessTokenAndTempToken(HttpServletRequest request, TokenType tokenType) {
-        if (TokenType.REFRESH.equals(tokenType)) {
-            throw new IllegalArgumentException("Refresh token cannot be used to extract user ID in this method only from entity");
-        }
-        String token = extractTokenFromRequest(request, tokenType);
-        // Extract the information stored inside the token
-        Claims claims = extractAllClaims(token);
-        Object userId = claims.get("userId");
-        if (userId == null) {
-            return null;
-        }
-        return UUID.fromString(userId.toString());
-    }
 
     public void deleteToken(UUID userId){
         jwtRepository.deleteAllByUsersId(userId);

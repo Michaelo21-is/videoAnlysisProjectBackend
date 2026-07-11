@@ -32,8 +32,7 @@ public class AuthController {
         return ResponseEntity.status(authResponse.getStatus()).body(authResponse.getMessage());
     }
     @PostMapping("/verify-2fa")
-    public ResponseEntity<?>verify2Factor(@RequestParam("verification-code") Integer verificationCode, HttpServletRequest request){
-        UUID userId = jwtService.getUserIdFromAccessTokenAndTempToken(request, TokenType.TEMPORARY);;
+    public ResponseEntity<?>verify2Factor(@RequestParam("verification-code") Integer verificationCode, @RequestHeader("X-USER-ID") UUID userId){
         AuthResponse authResponse = authService.verifyTwoFactor(verificationCode, userId);
         return ResponseEntity.status(authResponse.getStatus()).body(authResponse.getMessage());
     }
