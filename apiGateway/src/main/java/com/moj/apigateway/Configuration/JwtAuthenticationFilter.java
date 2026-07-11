@@ -8,7 +8,7 @@ import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,16 +23,39 @@ import reactor.core.publisher.Mono;
 import javax.crypto.SecretKey;
 import java.util.List;
 
-
+/**
+ * Reactive (WebFlux) gateway authentication filter.
+ *
+ * <p>Reads the JWT from cookies and validates it locally with the same HS256 secret that
+ * auth-service signs tokens with. Two token types are supported, distinguished by the
+ * {@code type} claim (see auth-service {@code JwtService}):</p>
+ * <ul>
+ *     <li><b>accessToken</b> cookie, {@code type=ACCESS} — full access, granted {@code ROLE_<role>}.</li>
+ *     <li><b>tempToken</b> cookie, {@code type=TEMPORARY} — 2FA step only, granted {@link #TEMP_AUTHORITY}
+ *     and deliberately NOT the user's role.</li>
+ * </ul>
+ *
+ * <p>The {@code type} claim is checked against the cookie the token arrived in, so a temp
+ * token cannot be replayed in the access cookie (or vice-versa) to escalate privileges.</p>
+ */
 @Component
 public class JwtAuthenticationFilter implements WebFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ACCESS_TOKEN_COOKIE = "accessToken";
+    private static final String TEMP_TOKEN_COOKIE = "tempToken";
+
+    private static final String TYPE_CLAIM = "type";
+    private static final String TYPE_ACCESS = "ACCESS";
+    private static final String TYPE_TEMPORARY = "TEMPORARY";
+
     private static final String USER_ID_HEADER = "X-USER-ID";
     private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
     private static final String USER_ROLE_HEADER = "X-USER-ROLE";
+
+    /** Authority carried by a 2FA temp token; grants access to the 2FA verification endpoint only. */
+    static final String TEMP_AUTHORITY = "TEMP_AUTH";
 
     private final SecretKey signingKey;
 
@@ -42,8 +65,8 @@ public class JwtAuthenticationFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        // Never trust identity headers coming from the client — strip them up front so only
-        // this filter can populate them after a successful validation.
+        // Never trust internal identity headers coming from the client — strip them up front
+        // so only this filter can populate them after a successful validation.
         ServerHttpRequest sanitizedRequest = exchange.getRequest().mutate()
                 .headers(headers -> {
                     headers.remove(USER_ID_HEADER);
@@ -51,58 +74,116 @@ public class JwtAuthenticationFilter implements WebFilter {
                     headers.remove(USER_ROLE_HEADER);
                 })
                 .build();
-        ServerWebExchange sanitizedExchange = exchange.mutate().request(sanitizedRequest).build();
 
-        String authHeader = sanitizedRequest.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        ServerWebExchange sanitizedExchange = exchange.mutate()
+                .request(sanitizedRequest)
+                .build();
 
-        // No bearer token: continue unauthenticated and let SecurityConfig's authorization
-        // rules decide (public routes pass, protected routes get 401).
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            return chain.filter(sanitizedExchange);
+        // Prefer a full access token when present; otherwise fall back to a 2FA temp token.
+        HttpCookie accessCookie = sanitizedRequest.getCookies().getFirst(ACCESS_TOKEN_COOKIE);
+        if (accessCookie != null && !accessCookie.getValue().isBlank()) {
+            return authenticateAccessToken(sanitizedExchange, chain, accessCookie.getValue());
         }
 
-        String token = authHeader.substring(BEARER_PREFIX.length());
+        HttpCookie tempCookie = sanitizedRequest.getCookies().getFirst(TEMP_TOKEN_COOKIE);
+        if (tempCookie != null && !tempCookie.getValue().isBlank()) {
+            return authenticateTempToken(sanitizedExchange, chain, tempCookie.getValue());
+        }
 
+        // No token: continue unauthenticated and let SecurityConfig's authorization rules decide.
+        return chain.filter(sanitizedExchange);
+    }
+
+    private Mono<Void> authenticateAccessToken(ServerWebExchange exchange, WebFilterChain chain, String token) {
         final Claims claims;
         try {
-            claims = Jwts.parser()
-                    .verifyWith(signingKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+            claims = parse(token);
         } catch (JwtException | IllegalArgumentException e) {
-            // A token was presented but is invalid/expired/tampered -> reject explicitly.
-            log.warn("Rejected request with invalid JWT: {}", e.getMessage());
-            return unauthorized(sanitizedExchange);
+            log.warn("Rejected request with invalid access token: {}", e.getMessage());
+            return unauthorized(exchange);
+        }
+
+        if (!TYPE_ACCESS.equals(claims.get(TYPE_CLAIM, String.class))) {
+            log.warn("Rejected non-ACCESS token presented in the accessToken cookie");
+            return unauthorized(exchange);
         }
 
         String email = claims.getSubject();
-        String userId = claims.get("userId") != null ? claims.get("userId").toString() : null;
-        String role = claims.get("role") != null ? claims.get("role").toString() : null;
+        String userId = claims.get("userId", String.class);
+        String role = claims.get("role", String.class);
 
-        // Forward the resolved identity to downstream services as trusted headers.
-        ServerHttpRequest.Builder mutated = sanitizedExchange.getRequest().mutate();
+        ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate();
         if (userId != null) {
-            mutated.header(USER_ID_HEADER, userId);
+            requestBuilder.header(USER_ID_HEADER, userId);
         }
         if (email != null) {
-            mutated.header(USER_EMAIL_HEADER, email);
+            requestBuilder.header(USER_EMAIL_HEADER, email);
         }
         if (role != null) {
-            mutated.header(USER_ROLE_HEADER, role);
+            requestBuilder.header(USER_ROLE_HEADER, role);
         }
-        ServerWebExchange authenticatedExchange = sanitizedExchange.mutate()
-                .request(mutated.build())
+
+        List<SimpleGrantedAuthority> authorities = role == null
+                ? List.of()
+                : List.of(new SimpleGrantedAuthority("ROLE_" + role));
+
+        return authenticate(exchange, chain, requestBuilder.build(), email, authorities);
+    }
+
+    private Mono<Void> authenticateTempToken(ServerWebExchange exchange, WebFilterChain chain, String token) {
+        final Claims claims;
+        try {
+            claims = parse(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Rejected request with invalid temp token: {}", e.getMessage());
+            return unauthorized(exchange);
+        }
+
+        if (!TYPE_TEMPORARY.equals(claims.get(TYPE_CLAIM, String.class))) {
+            log.warn("Rejected non-TEMPORARY token presented in the tempToken cookie");
+            return unauthorized(exchange);
+        }
+
+        String email = claims.getSubject();
+        String userId = claims.get("userId", String.class);
+
+        // Forward only the identity a 2FA step needs — deliberately NOT the user's role.
+        ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate();
+        if (userId != null) {
+            requestBuilder.header(USER_ID_HEADER, userId);
+        }
+        if (email != null) {
+            requestBuilder.header(USER_EMAIL_HEADER, email);
+        }
+
+        List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(TEMP_AUTHORITY));
+
+        return authenticate(exchange, chain, requestBuilder.build(), email, authorities);
+    }
+
+    private Mono<Void> authenticate(ServerWebExchange exchange,
+                                    WebFilterChain chain,
+                                    ServerHttpRequest mutatedRequest,
+                                    String principal,
+                                    List<SimpleGrantedAuthority> authorities) {
+        ServerWebExchange authenticatedExchange = exchange.mutate()
+                .request(mutatedRequest)
                 .build();
 
-        List<SimpleGrantedAuthority> authorities = role != null
-                ? List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                : List.of();
         UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(email, null, authorities);
+                new UsernamePasswordAuthenticationToken(principal, null, authorities);
 
         return chain.filter(authenticatedExchange)
                 .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication));
+    }
+
+    private Claims parse(String token) {
+        // parseSignedClaims verifies the signature and enforces expiration (throws on both).
+        return Jwts.parser()
+                .verifyWith(signingKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     private Mono<Void> unauthorized(ServerWebExchange exchange) {

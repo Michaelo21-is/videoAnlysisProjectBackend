@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -21,24 +22,30 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
-                // Stateless gateway with bearer tokens: CSRF is not applicable.
-                .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                // No browser login / basic auth on the gateway.
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(
+                                CookieServerCsrfTokenRepository.withHttpOnlyFalse()
+                        )
+                )
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-                // CORS is handled by Spring Cloud Gateway's globalcors (application.yml);
-                // intentionally NOT configured here to avoid duplicate/conflicting CORS handling.
                 .authorizeExchange(exchange -> exchange
-                        // Let CORS pre-flight requests through to the gateway CORS handler.
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // Auth endpoints (login/register) must be reachable without a token.
+                        .pathMatchers("/api/csrf").permitAll()
                         .pathMatchers("/api/auth/sign-up").permitAll()
                         .pathMatchers("/api/auth/sign-in").permitAll()
-
-                        // Everything else requires a valid JWT.
-                        .anyExchange().authenticated())
-                // Plug the JWT filter into the security chain at the authentication stage.
-                .addFilterAt(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                        // 2FA verification is reachable ONLY with a temp token (TEMP_AUTH),
+                        // never with a full access token.
+                        .pathMatchers(HttpMethod.POST, "/api/auth/verify-2fa")
+                        .hasAuthority(JwtAuthenticationFilter.TEMP_AUTHORITY)
+                        // Every other protected endpoint requires a real access token, i.e. a
+                        // normal role. A temp token only carries TEMP_AUTH, so it is rejected here.
+                        .anyExchange().hasAnyRole("USER", "ADMIN")
+                )
+                .addFilterAt(
+                        jwtAuthenticationFilter,
+                        SecurityWebFiltersOrder.AUTHENTICATION
+                )
                 .build();
     }
 }

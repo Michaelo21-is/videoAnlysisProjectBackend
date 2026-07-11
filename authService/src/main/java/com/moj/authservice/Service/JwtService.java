@@ -54,6 +54,10 @@ public class JwtService {
     public String generateToken(Users user, TokenType tokenType) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
+        // Token type is required so the API Gateway can cryptographically distinguish an
+        // ACCESS token from a short-lived TEMPORARY (2FA) token — otherwise the two are
+        // indistinguishable and a temp token could be replayed as a full access token.
+        claims.put("type", tokenType.name());
 
         if (user.getRole() != null) {
             claims.put("role", user.getRole().name());
