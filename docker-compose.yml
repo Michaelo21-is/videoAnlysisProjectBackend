@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: ./authService
+    container_name: auth-service
+    ports:
+      - "8080:8080"
+    environment:
+
+      # PostgreSQL (referenced by application.properties)
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      # RabbitMQ (Spring relaxed binding: SPRING_RABBITMQ_* -> spring.rabbitmq.*)
+      SPRING_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      SPRING_RABBITMQ_PORT: ${RABBITMQ_PORT}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      # JWT
+      JWT_SECRET_KEY: ${SECURITY_JWT_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notification-service:
+    build: ./notificationService
+    container_name: notification-service
+    ports:
+      - "8081:8081"
+    environment:
+      # RabbitMQ (Spring relaxed binding: SPRING_RABBITMQ_* -> spring.rabbitmq.*)
+      SPRING_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      SPRING_RABBITMQ_PORT: ${RABBITMQ_PORT}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      # Resend email API
+      RESEND_API_KEY: ${RESEND_API_KEY}
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  api-gateway:
+    build: ./apiGateway
+    container_name: api-gateway
+    ports:
+      - "8762:8762"
+    environment:
+      # Internal Docker service URL for routing (application.yml -> AUTH_SERVICE_URL)
+      AUTH_SERVICE_URL: http://auth-service:8080
+      # Allowed CORS origin (application.yml globalcors -> WEBSITE_URL)
+      WEBSITE_URL: ${WEBSITE_URL:-http://localhost:5173}
+      # Same HS256 secret auth-service signs tokens with (application.yml -> jwt.secret-key)
+      JWT_SECRET_KEY: ${SECURITY_JWT_SECRET_KEY}
+    depends_on:
+      auth-service:
+        condition: service_started
+
+volumes:
+  postgres-data:

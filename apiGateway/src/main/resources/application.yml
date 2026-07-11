@@ -1,0 +1,38 @@
+server:
+  port: 8762
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: auth-service-route
+              uri: ${AUTH_SERVICE_URL:http://localhost:8080}
+              predicates:
+                - Path=/api/auth/**
+
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - ${WEBSITE_URL:http://localhost:5173}
+
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+
+                allowedHeaders: "*"
+                allowCredentials: true
+
+# Shared HS256 secret used to validate JWTs issued by auth-service.
+# Provided via the JWT_SECRET_KEY environment variable (see docker-compose / .env).
+jwt:
+  secret-key: ${JWT_SECRET_KEY}

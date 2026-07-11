@@ -22,7 +22,7 @@ public class NotificationService {
         Resend resend = new Resend(resendApiKey);
         CreateEmailOptions params = CreateEmailOptions.builder()
                 .from("Acme <onboarding@resend.dev>")
-                .to("delivered@resend.dev")
+                .to(twoFactorEmailDataDto.getEmail())
                 .subject("2 fa verification code")
                 .html("<h1>Your verification code is: " + twoFactorEmailDataDto.getVerificationCode() + "</h1>")
                 .build();
@@ -30,7 +30,7 @@ public class NotificationService {
         try {
             resend.emails().send(params);
         } catch (ResendException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Failed to send two-factor email", e);
         }
     }
 }
