@@ -16,10 +16,8 @@ import java.util.UUID;
 @RequestMapping("/api/auth")
 public class AuthController {
     private final AuthService authService;
-    private final JwtService jwtService;
-    public AuthController(AuthService authService, JwtService jwtService) {
+    public AuthController(AuthService authService) {
         this.authService = authService;
-        this.jwtService = jwtService;
     }
     @PostMapping("/sign-up")
     public ResponseEntity<?> signUp(@RequestBody SignUpDto signUpDto) {

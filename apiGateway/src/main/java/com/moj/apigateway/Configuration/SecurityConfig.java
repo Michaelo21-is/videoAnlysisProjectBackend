@@ -31,8 +31,10 @@ public class SecurityConfig {
                 .authorizeExchange(exchange -> exchange
                         // Let CORS pre-flight requests through to the gateway CORS handler.
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // Auth endpoints (login/register/refresh) must be reachable without a token.
-                        .pathMatchers("/api/auth/**").permitAll()
+                        // Auth endpoints (login/register) must be reachable without a token.
+                        .pathMatchers("/api/auth/sign-up").permitAll()
+                        .pathMatchers("/api/auth/sign-in").permitAll()
+
                         // Everything else requires a valid JWT.
                         .anyExchange().authenticated())
                 // Plug the JWT filter into the security chain at the authentication stage.
