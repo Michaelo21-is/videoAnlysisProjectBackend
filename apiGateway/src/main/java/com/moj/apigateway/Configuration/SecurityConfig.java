@@ -36,8 +36,8 @@ public class SecurityConfig {
                         .pathMatchers("/api/auth/sign-in").permitAll()
                         // 2FA verification is reachable ONLY with a temp token (TEMP_AUTH),
                         // never with a full access token.
-                        .pathMatchers(HttpMethod.POST, "/api/auth/verify-2fa")
-                        .hasAuthority(JwtAuthenticationFilter.TEMP_AUTHORITY)
+                        .pathMatchers(HttpMethod.POST, "/api/auth/verify-2fa").hasAuthority(JwtAuthenticationFilter.TEMP_AUTHORITY)
+                        .pathMatchers(HttpMethod.POST, "/api/auth/verify-2fa").hasAuthority(JwtAuthenticationFilter.TEMP_AUTHORITY)
                         // Every other protected endpoint requires a real access token, i.e. a
                         // normal role. A temp token only carries TEMP_AUTH, so it is rejected here.
                         .anyExchange().hasAnyRole("USER", "ADMIN")

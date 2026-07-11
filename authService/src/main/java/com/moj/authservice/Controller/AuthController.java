@@ -34,4 +34,9 @@ public class AuthController {
         AuthResponse authResponse = authService.verifyTwoFactor(verificationCode, userId);
         return ResponseEntity.status(authResponse.getStatus()).body(authResponse.getMessage());
     }
+    @PostMapping("/renew_2fa")
+    public ResponseEntity<String>renew2Factor(@RequestHeader("X-USER-ID") UUID userId){
+        authService.setTwoFactor(userId);
+        return ResponseEntity.ok("two factor has been renewed, check your email.");
+    }
 }

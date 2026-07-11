@@ -112,7 +112,7 @@ public class AuthService {
     ///
         /// private functions
     ///
-    private void setTwoFactor(UUID userId){
+    public void setTwoFactor(UUID userId){
         Users user = (Users) usersRepository.findById(userId)
                 .orElseThrow(()-> new RuntimeException("something went wrong with passing the user id check in table if user created before"));
         Integer twoFactorCode = (int) (Math.random() * 900000) + 100000;
