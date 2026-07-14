@@ -6,6 +6,7 @@ import com.moj.authservice.Dto.SignUpDto;
 import com.moj.authservice.Entity.TwoFactor;
 import com.moj.authservice.Entity.Users;
 import com.moj.authservice.Enums.Role;
+import com.moj.authservice.Enums.TwoFactorType;
 import com.moj.authservice.Repository.TwoFactorRepository;
 import com.moj.authservice.Repository.UsersRepository;
 import com.moj.authservice.Response.AuthResponse;
@@ -34,7 +35,7 @@ public class AuthService {
         this.twoFactorRepository = twoFactorRepository;
         this.rabbitTemplate = rabbitTemplate;
     }
-
+    @Transactional
     public AuthResponse signUp(SignUpDto signUpDto){
         if (signUpDto.getPassword().length() < 6){
             return AuthResponse.builder()
@@ -60,7 +61,7 @@ public class AuthService {
                 .creditSum(0L)
                 .build();
         usersRepository.save(user);
-        setTwoFactor(user.getId());
+        setTwoFactor(user.getId(), TwoFactorType.EMAILVERIFICATION);
 
         return AuthResponse.builder()
                 .message("user created successfully")
@@ -74,7 +75,7 @@ public class AuthService {
         if (signInDto.getPassword().length() < 6){
             return AuthResponse.builder()
                     .message("password must be at least 6 characters")
-                    .status(HttpStatus.BAD_REQUEST)
+                    .status(HttpStatus.UNAUTHORIZED)
                     .build();
         }
         String encodedPassword = passwordEncoder.encode(signInDto.getPassword());
@@ -86,9 +87,11 @@ public class AuthService {
         }
         return AuthResponse.builder()
                 .message("invalid email or password")
-                .status(HttpStatus.BAD_REQUEST)
+                .status(HttpStatus.UNAUTHORIZED)
                 .build();
     }
+
+
 
     @Transactional
     public AuthResponse verifyTwoFactor(Integer twoFactorCode, UUID userId){
@@ -109,24 +112,64 @@ public class AuthService {
     }
 
 
-    ///
-        /// private functions
-    ///
-    public void setTwoFactor(UUID userId){
-        Users user = (Users) usersRepository.findById(userId)
+
+    @Transactional
+    public void setTwoFactor(UUID userId, TwoFactorType twoFactorType){
+        Users user = usersRepository.findById(userId)
                 .orElseThrow(()-> new RuntimeException("something went wrong with passing the user id check in table if user created before"));
         Integer twoFactorCode = (int) (Math.random() * 900000) + 100000;
         TwoFactor twoFactor = TwoFactor.builder()
                 .twoFactorCode(twoFactorCode)
                 .ExpirationDate(Instant.now().plus(15, ChronoUnit.MINUTES))
                 .users(user)
+                .twoFactorType(twoFactorType)
                 .build();
         twoFactorRepository.save(twoFactor);
         TwoFactorResponse twoFactorResponse = TwoFactorResponse.builder()
                 .verificationCode(twoFactorCode)
                 .email(user.getEmail())
+                .twoFactorType(twoFactorType)
                 .build();
         rabbitTemplate.convertAndSend(RabbitMqConfig.Exchange,RabbitMqConfig.ROUTING_KEY, twoFactorResponse);
     }
 
+
+
+    @Transactional
+    public AuthResponse restPasswordRequest(String email){
+        UUID userId = usersRepository.findUserIdByEmail(email)
+                .orElse(null);
+        if (userId == null){
+            return AuthResponse.builder()
+                    .message("user with this email does not exist")
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .build();
+        }
+        setTwoFactor(userId, TwoFactorType.PASSWORDRESET);
+        return AuthResponse.builder()
+                .message("password reset request sent successfully")
+                .status(HttpStatus.OK)
+                .build();
+    }
+
+
+
+    @Transactional
+    public AuthResponse setNewPassword(UUID userId, String newPassword){
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(()-> new RuntimeException("something went wrong with passing the user id check in table if user created before"));
+        if (newPassword.length() < 6){
+            return AuthResponse.builder()
+                    .message("password must be at least 6 characters")
+                    .status(HttpStatus.BAD_REQUEST)
+                    .build();
+        }
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        user.setPassword(encodedPassword);
+        usersRepository.save(user);
+        return AuthResponse.builder()
+                .message("password reset successful")
+                .status(HttpStatus.OK)
+                .build();
+    }
 }

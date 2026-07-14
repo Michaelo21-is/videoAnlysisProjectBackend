@@ -2,6 +2,7 @@ package com.moj.notificationservice.Service;
 
 import com.moj.notificationservice.Configuration.RabbitMqConfig;
 import com.moj.notificationservice.Dto.TwoFactorEmailDataDto;
+import com.moj.notificationservice.Util.GetMessageByTwoFactorType;
 import com.resend.Resend;
 import com.resend.core.exception.ResendException;
 import com.resend.services.emails.model.CreateEmailOptions;
@@ -20,11 +21,12 @@ public class NotificationService {
     @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
     public void sendEmail(TwoFactorEmailDataDto twoFactorEmailDataDto) {
         Resend resend = new Resend(resendApiKey);
+        String message = GetMessageByTwoFactorType.getMessage(twoFactorEmailDataDto.getTwoFactorType(), twoFactorEmailDataDto.getVerificationCode());
         CreateEmailOptions params = CreateEmailOptions.builder()
                 .from("Acme <onboarding@resend.dev>")
                 .to(twoFactorEmailDataDto.getEmail())
-                .subject("2 fa verification code")
-                .html("<h1>Your verification code is: " + twoFactorEmailDataDto.getVerificationCode() + "</h1>")
+                .subject("2 factor verification code")
+                .html("<h1>" + message + "</h1>")
                 .build();
 
         try {

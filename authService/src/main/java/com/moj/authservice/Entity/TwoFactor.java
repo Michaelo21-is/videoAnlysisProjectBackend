@@ -1,5 +1,6 @@
 package com.moj.authservice.Entity;
 
+import com.moj.authservice.Enums.TwoFactorType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,6 +24,9 @@ public class TwoFactor {
     private Integer twoFactorCode;
 
     private Instant ExpirationDate;
+
+    @Enumerated(EnumType.STRING)
+    private TwoFactorType twoFactorType;
 
     @OneToOne
     @JoinColumn(name = "users_id")

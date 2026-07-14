@@ -35,7 +35,7 @@ public class Users {
 
     private Long creditSum;
 
-    private boolean userVerifiedEmailw;
+    private boolean userVerifiedEmail;
 
     @OneToOne
     @JoinColumn(name = "subscription_id")
