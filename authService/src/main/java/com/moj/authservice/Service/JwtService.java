@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.SecretKey;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -22,9 +23,15 @@ import java.util.UUID;
 
 @Service
 public class JwtService {
-    private final Long ACCESS_TOKEN_EXPIRATION_TIME_MS = 15L * 60 * 1000;
-    private final Long REFRESH_TOKEN_EXPIRATION_TIME_MS = 14L * 24 * 60 * 60 * 1000;
-    private final Long TWO_FACTOR_CODE_EXPIRATION_TIME_MS = 10L * 60 * 1000;
+    public static final Duration ACCESS_TOKEN_EXPIRATION =
+            Duration.ofMinutes(15);
+
+    public static final Duration REFRESH_TOKEN_EXPIRATION =
+            Duration.ofDays(14);
+
+    public static final Duration TEMP_TOKEN_EXPIRATION =
+            Duration.ofMinutes(10);
+
 
     private final JWTRepository jwtRepository;
     private final String secretKey;
@@ -39,19 +46,25 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    private String buildToken(Map<String, Object> extraClaims, String subject, Long expiration) {
+    private String buildToken(
+            Map<String, Object> extraClaims,
+            String subject,
+            Duration expiration
+    ) {
+        Instant now = Instant.now();
+        Instant expirationTime = now.plus(expiration);
+
         return Jwts.builder()
                 .setClaims(extraClaims)
                 .setSubject(subject)
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(expirationTime))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public String generateToken(Users user, TokenType tokenType) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", user.getId());
         // Token type is required so the API Gateway can cryptographically distinguish an
         // ACCESS token from a short-lived TEMPORARY (2FA) token — otherwise the two are
         // indistinguishable and a temp token could be replayed as a full access token.
@@ -60,22 +73,19 @@ public class JwtService {
         if (user.getRole() != null) {
             claims.put("role", user.getRole().name());
         }
-        Long expirationTime ;
-        if (tokenType.equals(TokenType.ACCESS)) {
-            expirationTime = ACCESS_TOKEN_EXPIRATION_TIME_MS;
-        }
-        else if (tokenType.equals(TokenType.REFRESH)){
-            expirationTime = REFRESH_TOKEN_EXPIRATION_TIME_MS;
-        }
-        else{
-            expirationTime = TWO_FACTOR_CODE_EXPIRATION_TIME_MS;
-        }
-        return buildToken(claims, user.getEmail(), expirationTime);
+        Duration expiration = switch (tokenType) {
+            case ACCESS -> ACCESS_TOKEN_EXPIRATION;
+            case REFRESH -> REFRESH_TOKEN_EXPIRATION;
+            case TEMPORARY -> TEMP_TOKEN_EXPIRATION;
+        };
+        // The user id is the token subject — the gateway forwards it as X-USER-ID.
+        return buildToken(claims, user.getId().toString(), expiration);
     }
 
     @Transactional
     public void saveToken(String token, Users user){
-        Instant refreshExpiry = Instant.now().plus(14, ChronoUnit.DAYS);
+        Instant refreshExpiry =
+                Instant.now().plus(REFRESH_TOKEN_EXPIRATION);
         Jwt jwtToken = jwtRepository.findByUsersId(user.getId())
                 .orElse(
                         Jwt.builder()

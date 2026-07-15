@@ -6,10 +6,13 @@ import com.moj.authservice.Dto.SignUpDto;
 import com.moj.authservice.Entity.TwoFactor;
 import com.moj.authservice.Entity.Users;
 import com.moj.authservice.Enums.Role;
+import com.moj.authservice.Enums.TokenType;
 import com.moj.authservice.Enums.TwoFactorType;
 import com.moj.authservice.Repository.TwoFactorRepository;
 import com.moj.authservice.Repository.UsersRepository;
-import com.moj.authservice.Response.AuthResponse;
+import com.moj.authservice.Response.RegularResponse;
+import com.moj.authservice.Response.AccessAndRefreshResponse;
+import com.moj.authservice.Response.TempTokenResponse;
 import com.moj.authservice.Response.TwoFactorResponse;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
@@ -17,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -24,27 +28,31 @@ import java.util.UUID;
 
 @Service
 public class AuthService {
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private final UsersRepository usersRepository;
     private final TwoFactorRepository twoFactorRepository;
     private final PasswordEncoder passwordEncoder;
     private final RabbitTemplate rabbitTemplate;
+    private final JwtService jwtService;
 
-    public AuthService(UsersRepository usersRepository, PasswordEncoder passwordEncoder, TwoFactorRepository twoFactorRepository, RabbitTemplate rabbitTemplate) {
+    public AuthService(UsersRepository usersRepository, PasswordEncoder passwordEncoder
+            , TwoFactorRepository twoFactorRepository, RabbitTemplate rabbitTemplate, JwtService jwtService) {
         this.usersRepository = usersRepository;
         this.passwordEncoder = passwordEncoder;
         this.twoFactorRepository = twoFactorRepository;
         this.rabbitTemplate = rabbitTemplate;
+        this.jwtService = jwtService;
     }
     @Transactional
-    public AuthResponse signUp(SignUpDto signUpDto){
+    public TempTokenResponse signUp(SignUpDto signUpDto){
         if (signUpDto.getPassword().length() < 6){
-            return AuthResponse.builder()
+            return TempTokenResponse.builder()
                     .message("password must be at least 6 characters")
                     .status(HttpStatus.BAD_REQUEST)
                     .build();
         }
         if(usersRepository.existsByEmail(signUpDto.getEmail())){
-            return AuthResponse.builder()
+            return TempTokenResponse.builder()
                     .message("email already exists")
                     .status(HttpStatus.BAD_REQUEST)
                     .build();
@@ -63,48 +71,66 @@ public class AuthService {
         usersRepository.save(user);
         setTwoFactor(user.getId(), TwoFactorType.EMAILVERIFICATION);
 
-        return AuthResponse.builder()
+        String jwtTemp = jwtService.generateToken(user, TokenType.TEMPORARY);
+
+
+        return TempTokenResponse.builder()
                 .message("user created successfully")
+                .tempToken(jwtTemp)
                 .status(HttpStatus.CREATED)
                 .build();
     }
 
 
 
-    public AuthResponse signIn(SignInDto signInDto){
+    public AccessAndRefreshResponse signIn(SignInDto signInDto){
         if (signInDto.getPassword().length() < 6){
-            return AuthResponse.builder()
+            return AccessAndRefreshResponse.builder()
                     .message("password must be at least 6 characters")
                     .status(HttpStatus.UNAUTHORIZED)
                     .build();
         }
-        String encodedPassword = passwordEncoder.encode(signInDto.getPassword());
-        if (usersRepository.existsByEmailAndPassword(signInDto.getEmail(), encodedPassword)){
-            return AuthResponse.builder()
-                    .message("login successful")
-                    .status(HttpStatus.OK)
+        Users user = usersRepository.findUserByEmail(signInDto.getEmail())
+        .orElse(null);
+        if (user == null || !passwordEncoder.matches(signInDto.getPassword(), user.getPassword())) {
+            return AccessAndRefreshResponse.builder()
+                    .message("Invalid email or password")
+                    .status(HttpStatus.UNAUTHORIZED)
                     .build();
         }
-        return AuthResponse.builder()
-                .message("invalid email or password")
-                .status(HttpStatus.UNAUTHORIZED)
-                .build();
+
+            String accessToken = jwtService.generateToken(user, TokenType.ACCESS);
+            String refreshToken = jwtService.generateToken(user, TokenType.REFRESH);
+            // Persist the refresh token — renewAccessToken looks it up in the DB, so an
+            // unsaved refresh token could never be redeemed.
+            jwtService.saveToken(refreshToken, user);
+            return AccessAndRefreshResponse.builder()
+                    .message("login successful")
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .status(HttpStatus.OK)
+                    .build();
     }
 
 
 
     @Transactional
-    public AuthResponse verifyTwoFactor(Integer twoFactorCode, UUID userId){
+    public AccessAndRefreshResponse verifyTwoFactor(Integer twoFactorCode, UUID userId){
         TwoFactor twoFactor = twoFactorRepository.findByUsersId(userId).
                 orElseThrow(()-> new RuntimeException("cannot find the user with this id"));
-        if (twoFactor.getTwoFactorCode().equals(twoFactorCode)){
+        if (twoFactor.getTwoFactorCode().equals(twoFactorCode) && twoFactor.getExpirationDate().isAfter(Instant.now())){
+            String accessToken = jwtService.generateToken(twoFactor.getUsers(), TokenType.ACCESS);
+            String refreshToken = jwtService.generateToken(twoFactor.getUsers(), TokenType.REFRESH);
+            jwtService.saveToken(refreshToken, twoFactor.getUsers());
             twoFactorRepository.delete(twoFactor);
-            return AuthResponse.builder()
+            return AccessAndRefreshResponse.builder()
                     .message("two factor code is correct")
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
                     .status(HttpStatus.OK)
                     .build();
         }
-        return AuthResponse.builder()
+        return AccessAndRefreshResponse.builder()
                 .message("two factor code is incorrect")
                 .status(HttpStatus.BAD_REQUEST)
                 .build();
@@ -117,7 +143,8 @@ public class AuthService {
     public void setTwoFactor(UUID userId, TwoFactorType twoFactorType){
         Users user = usersRepository.findById(userId)
                 .orElseThrow(()-> new RuntimeException("something went wrong with passing the user id check in table if user created before"));
-        Integer twoFactorCode = (int) (Math.random() * 900000) + 100000;
+        twoFactorRepository.deleteByUsersId(userId);
+        int twoFactorCode = SECURE_RANDOM.nextInt(900000) + 100000;
         TwoFactor twoFactor = TwoFactor.builder()
                 .twoFactorCode(twoFactorCode)
                 .ExpirationDate(Instant.now().plus(15, ChronoUnit.MINUTES))
@@ -136,30 +163,32 @@ public class AuthService {
 
 
     @Transactional
-    public AuthResponse restPasswordRequest(String email){
-        UUID userId = usersRepository.findUserIdByEmail(email)
+    public TempTokenResponse restPasswordRequest(String email){
+        Users user = usersRepository.findUserByEmail(email)
                 .orElse(null);
-        if (userId == null){
-            return AuthResponse.builder()
+        if (user == null){
+            return TempTokenResponse.builder()
                     .message("user with this email does not exist")
                     .status(HttpStatus.UNAUTHORIZED)
                     .build();
         }
-        setTwoFactor(userId, TwoFactorType.PASSWORDRESET);
-        return AuthResponse.builder()
+        setTwoFactor(user.getId(), TwoFactorType.PASSWORDRESET);
+        String tempToken = jwtService.generateToken(user, TokenType.TEMPORARY);
+        return TempTokenResponse.builder()
                 .message("password reset request sent successfully")
                 .status(HttpStatus.OK)
+                .tempToken(tempToken)
                 .build();
     }
 
 
 
     @Transactional
-    public AuthResponse setNewPassword(UUID userId, String newPassword){
+    public RegularResponse setNewPassword(UUID userId, String newPassword){
         Users user = usersRepository.findById(userId)
                 .orElseThrow(()-> new RuntimeException("something went wrong with passing the user id check in table if user created before"));
         if (newPassword.length() < 6){
-            return AuthResponse.builder()
+            return RegularResponse.builder()
                     .message("password must be at least 6 characters")
                     .status(HttpStatus.BAD_REQUEST)
                     .build();
@@ -167,7 +196,7 @@ public class AuthService {
         String encodedPassword = passwordEncoder.encode(newPassword);
         user.setPassword(encodedPassword);
         usersRepository.save(user);
-        return AuthResponse.builder()
+        return RegularResponse.builder()
                 .message("password reset successful")
                 .status(HttpStatus.OK)
                 .build();

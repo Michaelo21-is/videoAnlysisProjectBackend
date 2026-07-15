@@ -27,11 +27,12 @@ import java.util.List;
  * Reactive (WebFlux) gateway authentication filter.
  *
  * <p>Reads the JWT from cookies and validates it locally with the same HS256 secret that
- * auth-service signs tokens with. Two token types are supported, distinguished by the
- * {@code type} claim (see auth-service {@code JwtService}):</p>
+ * auth-service signs tokens with. The token subject is the user id (see auth-service
+ * {@code JwtService}). Two token types are supported, distinguished by the
+ * {@code type} claim:</p>
  * <ul>
- *     <li><b>accessToken</b> cookie, {@code type=ACCESS} — full access, granted {@code ROLE_<role>}.</li>
- *     <li><b>tempToken</b> cookie, {@code type=TEMPORARY} — 2FA step only, granted {@link #TEMP_AUTHORITY}
+ *     <li><b>access-token</b> cookie, {@code type=ACCESS} — full access, granted {@code ROLE_<role>}.</li>
+ *     <li><b>temp-token</b> cookie, {@code type=TEMPORARY} — 2FA step only, granted {@link #TEMP_AUTHORITY}
  *     and deliberately NOT the user's role.</li>
  * </ul>
  *
@@ -43,15 +44,15 @@ public class JwtAuthenticationFilter implements WebFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    private static final String ACCESS_TOKEN_COOKIE = "accessToken";
-    private static final String TEMP_TOKEN_COOKIE = "tempToken";
+    // Must match the cookie names auth-service sets (see auth-service CookieUtil).
+    private static final String ACCESS_TOKEN_COOKIE = "access-token";
+    private static final String TEMP_TOKEN_COOKIE = "temp-token";
 
     private static final String TYPE_CLAIM = "type";
     private static final String TYPE_ACCESS = "ACCESS";
     private static final String TYPE_TEMPORARY = "TEMPORARY";
 
     private static final String USER_ID_HEADER = "X-USER-ID";
-    private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
     private static final String USER_ROLE_HEADER = "X-USER-ROLE";
 
     /** Authority carried by a 2FA temp token; grants access to the 2FA verification endpoint only. */
@@ -70,7 +71,6 @@ public class JwtAuthenticationFilter implements WebFilter {
         ServerHttpRequest sanitizedRequest = exchange.getRequest().mutate()
                 .headers(headers -> {
                     headers.remove(USER_ID_HEADER);
-                    headers.remove(USER_EMAIL_HEADER);
                     headers.remove(USER_ROLE_HEADER);
                 })
                 .build();
@@ -108,16 +108,12 @@ public class JwtAuthenticationFilter implements WebFilter {
             return unauthorized(exchange);
         }
 
-        String email = claims.getSubject();
-        String userId = claims.get("userId", String.class);
+        String userId = claims.getSubject();
         String role = claims.get("role", String.class);
 
         ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate();
         if (userId != null) {
             requestBuilder.header(USER_ID_HEADER, userId);
-        }
-        if (email != null) {
-            requestBuilder.header(USER_EMAIL_HEADER, email);
         }
         if (role != null) {
             requestBuilder.header(USER_ROLE_HEADER, role);
@@ -127,7 +123,7 @@ public class JwtAuthenticationFilter implements WebFilter {
                 ? List.of()
                 : List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
-        return authenticate(exchange, chain, requestBuilder.build(), email, authorities);
+        return authenticate(exchange, chain, requestBuilder.build(), userId, authorities);
     }
 
     private Mono<Void> authenticateTempToken(ServerWebExchange exchange, WebFilterChain chain, String token) {
@@ -144,21 +140,17 @@ public class JwtAuthenticationFilter implements WebFilter {
             return unauthorized(exchange);
         }
 
-        String email = claims.getSubject();
-        String userId = claims.get("userId", String.class);
+        String userId = claims.getSubject();
 
         // Forward only the identity a 2FA step needs — deliberately NOT the user's role.
         ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate();
         if (userId != null) {
             requestBuilder.header(USER_ID_HEADER, userId);
         }
-        if (email != null) {
-            requestBuilder.header(USER_EMAIL_HEADER, email);
-        }
 
         List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(TEMP_AUTHORITY));
 
-        return authenticate(exchange, chain, requestBuilder.build(), email, authorities);
+        return authenticate(exchange, chain, requestBuilder.build(), userId, authorities);
     }
 
     private Mono<Void> authenticate(ServerWebExchange exchange,

@@ -49,6 +49,9 @@ services:
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       # JWT
       JWT_SECRET_KEY: ${SECURITY_JWT_SECRET_KEY}
+      # COOKIES
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE}
     depends_on:
       postgres:
         condition: service_healthy
