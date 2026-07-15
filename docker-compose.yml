@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${DATABASE_USERNAME}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -82,7 +82,7 @@ services:
       # Internal Docker service URL for routing (application.yml -> AUTH_SERVICE_URL)
       AUTH_SERVICE_URL: http://auth-service:8080
       # Allowed CORS origin (application.yml globalcors -> WEBSITE_URL)
-      WEBSITE_URL: ${WEBSITE_URL:-http://localhost:5173}
+      WEBSITE_URL: ${WEBSITE_URL:-http://localhost:3000}
       # Same HS256 secret auth-service signs tokens with (application.yml -> jwt.secret-key)
       JWT_SECRET_KEY: ${SECURITY_JWT_SECRET_KEY}
     depends_on:
