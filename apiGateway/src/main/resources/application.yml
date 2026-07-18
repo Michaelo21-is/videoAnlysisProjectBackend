@@ -17,3 +17,17 @@ spring:
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
+logging:
+  level:
+    root: INFO
+
+    # החלף ב-package האמיתי של ה-Gateway שלך
+    com.moj.apigateway: DEBUG
+
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: INFO
+
+    # חיבורי HTTP של WebFlux
+    reactor.netty.http.client: INFO
+    reactor.netty.http.server: INFO
