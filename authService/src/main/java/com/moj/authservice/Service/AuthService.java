@@ -204,4 +204,11 @@ public class AuthService {
                 .status(HttpStatus.OK)
                 .build();
     }
+
+    public boolean isUserAllowedOnTwoFactorPage(String email, UUID userId) {
+        if (email == null || userId == null) {
+            return false;
+        }
+        return usersRepository.existsByIdAndEmail(userId, email);
+    }
 }

@@ -111,4 +111,10 @@ public class AuthController {
         RegularResponse regularResponse = authService.setNewPassword(userId, password);
         return ResponseEntity.status(regularResponse.getStatus()).body(regularResponse.getMessage());
     }
+
+    @GetMapping("/two-factor/status")
+    public ResponseEntity<Boolean>checkPagePermission(@RequestHeader("X-USER-ID") UUID userId, @RequestParam("email") String email){
+        boolean allowed = authService.isUserAllowedOnTwoFactorPage(email, userId);
+        return ResponseEntity.ok(allowed);
+    }
 }
