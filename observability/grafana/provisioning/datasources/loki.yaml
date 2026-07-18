@@ -1,0 +1,15 @@
+# Auto-provisioned Grafana data source. Grafana loads this on startup so Loki
+# is wired up with no manual clicking in the UI.
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    # Internal Docker DNS name of the Loki container (see docker-compose.yml).
+    url: http://loki:3100
+    isDefault: true
+    editable: false
+    jsonData:
+      # Cap lines returned per query so a broad query cannot overwhelm the browser.
+      maxLines: 1000

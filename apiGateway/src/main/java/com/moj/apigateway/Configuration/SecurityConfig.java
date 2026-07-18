@@ -1,5 +1,6 @@
 package com.moj.apigateway.Configuration;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -9,6 +10,13 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
 import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.web.server.WebFilter;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -22,9 +30,15 @@ public class SecurityConfig {
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(
-            ServerHttpSecurity http
+            ServerHttpSecurity http,
+            CorsConfigurationSource corsConfigurationSource
     ) {
         return http
+
+                // CORS must be handled by the security chain so it also covers local
+                // controllers (e.g. /api/csrf) — the gateway globalcors settings only
+                // apply to requests matched by gateway routes.
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
                 // CSRF protection for cookie-based authentication
                 .csrf(csrf -> csrf
@@ -83,5 +97,25 @@ public class SecurityConfig {
                 )
 
                 .build();
+    }
+
+    /**
+     * Single CORS definition for everything the gateway serves — both locally
+     * handled controllers and proxied routes. Allows the SPA origin to send
+     * credentialed requests (cookies) and the X-XSRF-TOKEN header.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${WEBSITE_URL:http://localhost:3000}") String websiteUrl
+    ) {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of(websiteUrl));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }

@@ -1,5 +1,6 @@
 package com.moj.authservice.Configuration;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -40,6 +41,11 @@ public class SecurityConfiguration {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // Error responses (4xx/5xx) are rendered via a container ERROR
+                        // dispatch to /error. Spring Security authorizes that dispatch
+                        // too, and /error would fall into anyRequest().hasAnyRole(...),
+                        // turning every error on a public endpoint into a bare 403.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/sign-up").permitAll()
                         .requestMatchers("/api/auth/sign-in").permitAll()
