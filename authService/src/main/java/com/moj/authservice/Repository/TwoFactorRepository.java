@@ -8,5 +8,4 @@ import java.util.UUID;
 
 public interface TwoFactorRepository extends JpaRepository<TwoFactor, Long> {
     Optional<TwoFactor> findByUsersId(UUID id);
-    void deleteByUsersId(UUID id);
 }

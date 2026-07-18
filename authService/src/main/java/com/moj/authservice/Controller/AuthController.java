@@ -83,7 +83,7 @@ public class AuthController {
 
 
 
-    @PostMapping("/renew_2fa")
+    @PostMapping("/renew-2fa")
     public ResponseEntity<String>renew2Factor(@RequestHeader("X-USER-ID") UUID userId, @RequestParam("two-factor-type")TwoFactorType twoFactorType){
         authService.setTwoFactor(userId, twoFactorType);
         return ResponseEntity.ok("two factor has been renewed, check your email.");

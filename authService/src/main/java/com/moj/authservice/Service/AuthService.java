@@ -143,15 +143,18 @@ public class AuthService {
     public void setTwoFactor(UUID userId, TwoFactorType twoFactorType){
         Users user = usersRepository.findById(userId)
                 .orElseThrow(()-> new RuntimeException("something went wrong with passing the user id check in table if user created before"));
-        twoFactorRepository.deleteByUsersId(userId);
         int twoFactorCode = SECURE_RANDOM.nextInt(900000) + 100000;
-        TwoFactor twoFactor = TwoFactor.builder()
-                .twoFactorCode(twoFactorCode)
-                .ExpirationDate(Instant.now().plus(15, ChronoUnit.MINUTES))
-                .users(user)
-                .twoFactorType(twoFactorType)
-                .build();
+        TwoFactor twoFactor = twoFactorRepository.findByUsersId(userId)
+                .orElseGet(() -> TwoFactor.builder()
+                        .users(user)
+                        .build()
+                );
+
+        twoFactor.setTwoFactorCode(twoFactorCode);
+        twoFactor.setExpirationDate((Instant.now().plus(15, ChronoUnit.MINUTES)));
+        twoFactor.setTwoFactorType(twoFactorType);
         twoFactorRepository.save(twoFactor);
+
         TwoFactorResponse twoFactorResponse = TwoFactorResponse.builder()
                 .verificationCode(twoFactorCode)
                 .email(user.getEmail())
