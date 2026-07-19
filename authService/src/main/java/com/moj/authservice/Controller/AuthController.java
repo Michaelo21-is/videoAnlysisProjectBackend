@@ -6,6 +6,7 @@ import com.moj.authservice.Dto.SignUpDto;
 import com.moj.authservice.Enums.TwoFactorType;
 import com.moj.authservice.Response.RegularResponse;
 import com.moj.authservice.Response.AccessAndRefreshResponse;
+import com.moj.authservice.Response.SignInResponse;
 import com.moj.authservice.Response.TempTokenResponse;
 import com.moj.authservice.Service.AuthService;
 import com.moj.authservice.Service.JwtService;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -49,17 +51,28 @@ public class AuthController {
 
     @PostMapping("/sign-in")
     public ResponseEntity<?>signIn(@RequestBody SignInDto signInDto) {
-        AccessAndRefreshResponse accessAndRefreshResponse = authService.signIn(signInDto);
-        if (accessAndRefreshResponse.getAccessToken() != null && accessAndRefreshResponse.getRefreshToken() != null){
-            ResponseCookie cookie = cookieUtil.createJwtCookie(CookieUtil.accessToken, accessAndRefreshResponse.getAccessToken(), JwtService.ACCESS_TOKEN_EXPIRATION);
-            ResponseCookie refreshCookie = cookieUtil.createJwtCookie(CookieUtil.refreshToken, accessAndRefreshResponse.getRefreshToken(), JwtService.REFRESH_TOKEN_EXPIRATION);
+        SignInResponse signInResponse = authService.signIn(signInDto);
+        if (signInResponse.getAccessToken() != null && signInResponse.getRefreshToken() != null){
+            ResponseCookie cookie = cookieUtil.createJwtCookie(CookieUtil.accessToken, signInResponse.getAccessToken(), JwtService.ACCESS_TOKEN_EXPIRATION);
+            ResponseCookie refreshCookie = cookieUtil.createJwtCookie(CookieUtil.refreshToken, signInResponse.getRefreshToken(), JwtService.REFRESH_TOKEN_EXPIRATION);
             return ResponseEntity
-                    .status(accessAndRefreshResponse.getStatus())
+                    .status(signInResponse.getStatus())
                     .header(HttpHeaders.SET_COOKIE, cookie.toString())
                     .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
-                    .body(accessAndRefreshResponse.getMessage());
+                    .body(signInResponse.getMessage());
         }
-        return ResponseEntity.status(accessAndRefreshResponse.getStatus()).body(accessAndRefreshResponse.getMessage());
+        if (signInResponse.getTempToken() != null){
+            ResponseCookie tempCookie = cookieUtil.createJwtCookie(CookieUtil.tempToken, signInResponse.getTempToken(), JwtService.TEMP_TOKEN_EXPIRATION);
+            return ResponseEntity
+                    .status(signInResponse.getStatus())
+                    .header(HttpHeaders.SET_COOKIE, tempCookie.toString())
+                    .body(Map.of(
+                            "message", signInResponse.getMessage(),
+                            "requiresEmailVerification",
+                            signInResponse.isRequiresEmailVerification()
+                    ));
+        }
+        return ResponseEntity.status(signInResponse.getStatus()).body(signInResponse.getMessage());
     }
 
 

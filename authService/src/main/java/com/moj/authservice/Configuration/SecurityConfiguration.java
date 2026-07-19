@@ -55,6 +55,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/auth/set-new-password").hasAuthority(GatewayHeaderAuthenticationFilter.TEMP_AUTHORITY)
                         .requestMatchers(HttpMethod.POST, "/api/auth/verify-2fa").hasAuthority(GatewayHeaderAuthenticationFilter.TEMP_AUTHORITY)
                         .requestMatchers(HttpMethod.POST,"/api/auth/renew-2fa").hasAuthority(GatewayHeaderAuthenticationFilter.TEMP_AUTHORITY)
+                        .requestMatchers("/api/auth/two-factor/status").hasAuthority(GatewayHeaderAuthenticationFilter.TEMP_AUTHORITY)
                         .requestMatchers("/error").permitAll()
                         // Every other endpoint requires a real access token, i.e. a normal
                         // role. A temp token only carries TEMP_AUTH, so it is rejected here.

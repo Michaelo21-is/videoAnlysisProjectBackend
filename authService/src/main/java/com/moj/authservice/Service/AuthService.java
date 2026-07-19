@@ -10,10 +10,7 @@ import com.moj.authservice.Enums.TokenType;
 import com.moj.authservice.Enums.TwoFactorType;
 import com.moj.authservice.Repository.TwoFactorRepository;
 import com.moj.authservice.Repository.UsersRepository;
-import com.moj.authservice.Response.RegularResponse;
-import com.moj.authservice.Response.AccessAndRefreshResponse;
-import com.moj.authservice.Response.TempTokenResponse;
-import com.moj.authservice.Response.TwoFactorResponse;
+import com.moj.authservice.Response.*;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -82,10 +79,10 @@ public class AuthService {
     }
 
 
-
-    public AccessAndRefreshResponse signIn(SignInDto signInDto){
+    @Transactional
+    public SignInResponse signIn(SignInDto signInDto){
         if (signInDto.getPassword().length() < 6){
-            return AccessAndRefreshResponse.builder()
+            return SignInResponse.builder()
                     .message("password must be at least 6 characters")
                     .status(HttpStatus.UNAUTHORIZED)
                     .build();
@@ -93,23 +90,33 @@ public class AuthService {
         Users user = usersRepository.findUserByEmail(signInDto.getEmail())
         .orElse(null);
         if (user == null || !passwordEncoder.matches(signInDto.getPassword(), user.getPassword())) {
-            return AccessAndRefreshResponse.builder()
+            return SignInResponse.builder()
                     .message("Invalid email or password")
                     .status(HttpStatus.UNAUTHORIZED)
                     .build();
-        }
+            }
 
-            String accessToken = jwtService.generateToken(user, TokenType.ACCESS);
-            String refreshToken = jwtService.generateToken(user, TokenType.REFRESH);
-            // Persist the refresh token — renewAccessToken looks it up in the DB, so an
-            // unsaved refresh token could never be redeemed.
-            jwtService.saveToken(refreshToken, user);
-            return AccessAndRefreshResponse.builder()
-                    .message("login successful")
-                    .accessToken(accessToken)
-                    .refreshToken(refreshToken)
+
+        if (!user.isUserVerifiedEmail()){
+            setTwoFactor(user.getId(), TwoFactorType.EMAILVERIFICATION);
+            String tempToken = jwtService.generateToken(user, TokenType.TEMPORARY);
+            return SignInResponse.builder()
+                    .message("please verify your email")
                     .status(HttpStatus.OK)
+                    .requiresEmailVerification(true)
+                    .tempToken(tempToken)
                     .build();
+        }
+        String accessToken = jwtService.generateToken(user, TokenType.ACCESS);
+        String refreshToken = jwtService.generateToken(user, TokenType.REFRESH);
+        jwtService.saveToken(refreshToken, user);
+
+        return SignInResponse.builder()
+                .message("login successful")
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .status(HttpStatus.OK)
+                .build();
     }
 
 
