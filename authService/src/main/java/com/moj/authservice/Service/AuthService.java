@@ -223,7 +223,14 @@ public class AuthService {
 
     @Transactional
     public RegularResponse setNewPassword(String resetToken, String newPassword){
-        ResetPasswordTicket resetPasswordTicket = resetPasswordTicketRepository.findByResetTokenAndExpirationDateAfter(resetToken, Instant.now())
+        if (resetToken == null || resetToken.isBlank()) {
+            return RegularResponse.builder()
+                    .message("reset token is missing")
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .build();
+        }
+        byte[] hashResetToken = GenerateResetToken.hashToken(resetToken);
+        ResetPasswordTicket resetPasswordTicket = resetPasswordTicketRepository.findByResetTokenAndExpirationDateAfter(hashResetToken, Instant.now())
                 .orElseThrow(() ->   new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Reset token is invalid or expired"));
         if (newPassword.length() < 6){
             return RegularResponse.builder()
