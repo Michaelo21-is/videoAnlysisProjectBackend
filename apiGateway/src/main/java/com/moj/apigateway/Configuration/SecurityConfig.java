@@ -4,10 +4,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint;
+import org.springframework.security.web.server.authorization.HttpStatusServerAccessDeniedHandler;
 import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
 import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
@@ -51,6 +54,20 @@ public class SecurityConfig {
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
 
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(
+                                new HttpStatusServerEntryPoint(
+                                        HttpStatus.UNAUTHORIZED
+                                )
+                        )
+                        .accessDeniedHandler(
+                                new HttpStatusServerAccessDeniedHandler(
+                                        HttpStatus.FORBIDDEN
+                                )
+                        )
+                )
+
+
                 .authorizeExchange(exchange -> exchange
 
                         // Allow browser preflight requests
@@ -62,7 +79,9 @@ public class SecurityConfig {
                                 "/api/csrf",
                                 "/api/auth/sign-up",
                                 "/api/auth/sign-in",
-                                "/api/auth/forgot-my-password-request"
+                                "/api/auth/forgot-my-password-request",
+                                "/api/auth/set-new-password"
+                                ,"api/auth/refresh-token"
                         )
                         .permitAll()
 
@@ -77,12 +96,13 @@ public class SecurityConfig {
                         .pathMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/verify-2fa",
-                                "/api/auth/renew-2fa",
-                                "/api/auth/set-new-password"
+                                "/api/auth/renew-2fa"
                         )
                         .hasAuthority(
                                 JwtAuthenticationFilter.TEMP_AUTHORITY
                         )
+                        .pathMatchers(HttpMethod.GET, "/api/auth/two-factor/status")
+                        .hasAuthority(JwtAuthenticationFilter.TEMP_AUTHORITY)
 
                         // All other endpoints require a normal authenticated user
                         .anyExchange()
@@ -104,7 +124,7 @@ public class SecurityConfig {
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
-            @Value("${WEBSITE_URL:http://localhost:3000}") String websiteUrl
+            @Value("${WEBSITE_URL}") String websiteUrl
     ) {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(websiteUrl));

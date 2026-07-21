@@ -4,11 +4,13 @@ import com.moj.authservice.Entity.Jwt;
 import com.moj.authservice.Entity.Users;
 import com.moj.authservice.Enums.TokenType;
 import com.moj.authservice.Repository.JWTRepository;
+import com.moj.authservice.Response.AccessAndRefreshResponse;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -106,16 +108,24 @@ public class JwtService {
         jwtRepository.deleteAllByUsersId(userId);
     }
     @Transactional
-    public void renewAccessToken(String refreshToken){
+    public AccessAndRefreshResponse renewAccessToken(String refreshToken){
         Jwt jwtToken = jwtRepository.findByRefreshToken(refreshToken)
                 .orElse(null);
         if (jwtToken == null || jwtToken.getExpirationDate().isBefore(Instant.now())) {
-            return;
+            return AccessAndRefreshResponse.builder()
+                    .message("refresh token is invalid or expired")
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .build();
         }
         String newAccessToken = generateToken(jwtToken.getUsers(), TokenType.ACCESS);
         String newRefreshToken = generateToken(jwtToken.getUsers(), TokenType.REFRESH);
         saveToken(newRefreshToken, jwtToken.getUsers());
 
-        // need to setup cookie
+        return AccessAndRefreshResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .message("access token renewed successfully")
+                .status(HttpStatus.OK)
+                .build();
     }
 }

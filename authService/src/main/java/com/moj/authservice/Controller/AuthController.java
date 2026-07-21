@@ -1,6 +1,6 @@
 package com.moj.authservice.Controller;
 
-import com.moj.authservice.Component.CookieUtil;
+import com.moj.authservice.Util.CookieUtil;
 import com.moj.authservice.Dto.SignInDto;
 import com.moj.authservice.Dto.SignUpDto;
 import com.moj.authservice.Enums.TwoFactorType;
@@ -106,22 +106,19 @@ public class AuthController {
 
     @PostMapping("/forgot-my-password-request")
     public ResponseEntity<?>forgotPassword(@RequestParam("email") String email){
-        TempTokenResponse regularResponse = authService.restPasswordRequest(email);
-        if (regularResponse.getTempToken() != null){
-            ResponseCookie cookie = cookieUtil.createJwtCookie(CookieUtil.tempToken, regularResponse.getTempToken(), JwtService.TEMP_TOKEN_EXPIRATION);
-            return ResponseEntity
-                    .status(regularResponse.getStatus())
-                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                    .body(regularResponse.getMessage());
-        }
+        RegularResponse regularResponse = authService.restPasswordRequest(email);
         return ResponseEntity.status(regularResponse.getStatus()).body(regularResponse.getMessage());
     }
 
-
+    @GetMapping("/password-reset/validate")
+    public ResponseEntity<Boolean>checkUserPermissionForRestPassword(@RequestHeader("X-Reset-Token") String resetToken){
+        Boolean response = authService.isResetTokenValid(resetToken);
+        return ResponseEntity.ok(response);
+    }
 
     @PostMapping("/set-new-password")
-    public ResponseEntity<?>setNewPassword(@RequestParam("password") String password, @RequestHeader("X-USER-ID") UUID userId){
-        RegularResponse regularResponse = authService.setNewPassword(userId, password);
+    public ResponseEntity<?>setNewPassword(@RequestParam("password") String password, @RequestHeader("X-Reset-Token") String resetToken){
+        RegularResponse regularResponse = authService.setNewPassword(resetToken, password);
         return ResponseEntity.status(regularResponse.getStatus()).body(regularResponse.getMessage());
     }
 
@@ -129,5 +126,24 @@ public class AuthController {
     public ResponseEntity<Boolean>checkPagePermission(@RequestHeader("X-USER-ID") UUID userId, @RequestParam("email") String email){
         boolean allowed = authService.isUserAllowedOnTwoFactorPage(email, userId);
         return ResponseEntity.ok(allowed);
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken(@CookieValue(name = "refresh-token", required = false) String refreshToken) {
+        AccessAndRefreshResponse response = authService.refreshToken(refreshToken);
+
+        if (response.getAccessToken() != null && response.getRefreshToken() != null) {
+            ResponseCookie accessCookie = cookieUtil.createJwtCookie(CookieUtil.accessToken, response.getAccessToken(), JwtService.ACCESS_TOKEN_EXPIRATION);
+            ResponseCookie refreshCookie = cookieUtil.createJwtCookie(CookieUtil.refreshToken, response.getRefreshToken(), JwtService.REFRESH_TOKEN_EXPIRATION);
+            return ResponseEntity
+                    .status(response.getStatus())
+                    .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                    .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                    .body(response.getMessage());
+        }
+
+        return ResponseEntity
+                .status(response.getStatus())
+                .body(response.getMessage());
     }
 }

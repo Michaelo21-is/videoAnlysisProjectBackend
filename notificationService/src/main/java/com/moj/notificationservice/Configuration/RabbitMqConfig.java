@@ -10,13 +10,19 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-    public static final String QUEUE_NAME = "two_factor_queue";
-
+    public static final String TWO_FACTOR_QUEUE = "two-factor-queue";
+    public static final String PASSWORD_RESET_QUEUE = "password-reset-queue";
     //checking if the queue is exist if not create it
     @Bean
     public Queue twoFactorQueue() {
         return QueueBuilder
-                .durable(QUEUE_NAME)
+                .durable(TWO_FACTOR_QUEUE)
+                .build();
+    }
+    @Bean
+    public Queue passwordResetQueue() {
+        return QueueBuilder
+                .durable(PASSWORD_RESET_QUEUE)
                 .build();
     }
 

@@ -1,4 +1,4 @@
-package com.moj.authservice.Component;
+package com.moj.authservice.Util;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;

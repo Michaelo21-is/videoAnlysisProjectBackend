@@ -3,19 +3,23 @@ package com.moj.authservice.Service;
 import com.moj.authservice.Configuration.RabbitMqConfig;
 import com.moj.authservice.Dto.SignInDto;
 import com.moj.authservice.Dto.SignUpDto;
+import com.moj.authservice.Entity.ResetPasswordTicket;
 import com.moj.authservice.Entity.TwoFactor;
 import com.moj.authservice.Entity.Users;
 import com.moj.authservice.Enums.Role;
 import com.moj.authservice.Enums.TokenType;
 import com.moj.authservice.Enums.TwoFactorType;
+import com.moj.authservice.Repository.ResetPasswordTicketRepository;
 import com.moj.authservice.Repository.TwoFactorRepository;
 import com.moj.authservice.Repository.UsersRepository;
 import com.moj.authservice.Response.*;
+import com.moj.authservice.Util.GenerateResetToken;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -31,14 +35,16 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final RabbitTemplate rabbitTemplate;
     private final JwtService jwtService;
+    private final ResetPasswordTicketRepository resetPasswordTicketRepository;
 
-    public AuthService(UsersRepository usersRepository, PasswordEncoder passwordEncoder
+    public AuthService(UsersRepository usersRepository, PasswordEncoder passwordEncoder, ResetPasswordTicketRepository resetPasswordTicketRepository
             , TwoFactorRepository twoFactorRepository, RabbitTemplate rabbitTemplate, JwtService jwtService) {
         this.usersRepository = usersRepository;
         this.passwordEncoder = passwordEncoder;
         this.twoFactorRepository = twoFactorRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.jwtService = jwtService;
+        this.resetPasswordTicketRepository = resetPasswordTicketRepository;
     }
     @Transactional
     public TempTokenResponse signUp(SignUpDto signUpDto){
@@ -124,7 +130,7 @@ public class AuthService {
     @Transactional
     public AccessAndRefreshResponse verifyTwoFactor(Integer twoFactorCode, UUID userId){
         TwoFactor twoFactor = twoFactorRepository.findByUsersId(userId).
-                orElseThrow(()-> new RuntimeException("cannot find the user with this id"));
+                orElseThrow(() -> new IllegalStateException("Two-factor record was not found for user: " + userId));
         if (twoFactor.getTwoFactorCode().equals(twoFactorCode) && twoFactor.getExpirationDate().isAfter(Instant.now())){
             String accessToken = jwtService.generateToken(twoFactor.getUsers(), TokenType.ACCESS);
             String refreshToken = jwtService.generateToken(twoFactor.getUsers(), TokenType.REFRESH);
@@ -167,36 +173,58 @@ public class AuthService {
                 .email(user.getEmail())
                 .twoFactorType(twoFactorType)
                 .build();
-        rabbitTemplate.convertAndSend(RabbitMqConfig.Exchange,RabbitMqConfig.ROUTING_KEY, twoFactorResponse);
+        rabbitTemplate.convertAndSend(RabbitMqConfig.AUTH_NOTIFICATION_EXCHANGE,RabbitMqConfig.TWO_FACTOR_ROUTING_KEY, twoFactorResponse);
     }
 
 
 
     @Transactional
-    public TempTokenResponse restPasswordRequest(String email){
+    public RegularResponse restPasswordRequest(String email){
         Users user = usersRepository.findUserByEmail(email)
                 .orElse(null);
         if (user == null){
-            return TempTokenResponse.builder()
+            return RegularResponse.builder()
                     .message("user with this email does not exist")
                     .status(HttpStatus.UNAUTHORIZED)
                     .build();
         }
-        setTwoFactor(user.getId(), TwoFactorType.PASSWORDRESET);
-        String tempToken = jwtService.generateToken(user, TokenType.TEMPORARY);
-        return TempTokenResponse.builder()
+
+        String resetToken = GenerateResetToken.generateResetToken();
+
+        ResetPasswordResponse resetPasswordResponse = ResetPasswordResponse.builder()
+                .email(email)
+                .resetToken(resetToken)
+                .build();
+
+        rabbitTemplate.convertAndSend(RabbitMqConfig.AUTH_NOTIFICATION_EXCHANGE, RabbitMqConfig.PASSWORD_RESET_ROUTING_KEY, resetPasswordResponse);
+
+        byte[] hashedToken = GenerateResetToken.hashToken(resetToken);
+
+        ResetPasswordTicket resetPasswordTicket = ResetPasswordTicket.builder()
+                .users(user)
+                .resetToken(hashedToken)
+                .expirationDate(Instant.now().plus(15, ChronoUnit.MINUTES))
+                .build();
+        resetPasswordTicketRepository.save(resetPasswordTicket);
+
+        return RegularResponse.builder()
                 .message("password reset request sent successfully")
                 .status(HttpStatus.OK)
-                .tempToken(tempToken)
                 .build();
     }
 
-
+    public boolean isResetTokenValid(String resetToken) {
+        if (resetToken == null || resetToken.isBlank()) {
+            return false;
+        }
+        byte[] hashedToken = GenerateResetToken.hashToken(resetToken);
+        return resetPasswordTicketRepository.existsByResetTokenAndExpirationDateAfter(hashedToken, Instant.now());
+    }
 
     @Transactional
-    public RegularResponse setNewPassword(UUID userId, String newPassword){
-        Users user = usersRepository.findById(userId)
-                .orElseThrow(()-> new RuntimeException("something went wrong with passing the user id check in table if user created before"));
+    public RegularResponse setNewPassword(String resetToken, String newPassword){
+        ResetPasswordTicket resetPasswordTicket = resetPasswordTicketRepository.findByResetTokenAndExpirationDateAfter(resetToken, Instant.now())
+                .orElseThrow(() ->   new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Reset token is invalid or expired"));
         if (newPassword.length() < 6){
             return RegularResponse.builder()
                     .message("password must be at least 6 characters")
@@ -204,8 +232,9 @@ public class AuthService {
                     .build();
         }
         String encodedPassword = passwordEncoder.encode(newPassword);
-        user.setPassword(encodedPassword);
-        usersRepository.save(user);
+        resetPasswordTicket.getUsers().setPassword(encodedPassword);
+        usersRepository.save(resetPasswordTicket.getUsers());
+        resetPasswordTicketRepository.delete(resetPasswordTicket);
         return RegularResponse.builder()
                 .message("password reset successful")
                 .status(HttpStatus.OK)
@@ -217,5 +246,16 @@ public class AuthService {
             return false;
         }
         return usersRepository.existsByIdAndEmail(userId, email);
+    }
+    @Transactional
+    public AccessAndRefreshResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return AccessAndRefreshResponse.builder()
+                    .message("refresh token is missing")
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .build();
+        }
+
+        return jwtService.renewAccessToken(refreshToken);
     }
 }

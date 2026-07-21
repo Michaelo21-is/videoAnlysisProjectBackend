@@ -1,13 +1,19 @@
 package com.moj.notificationservice.Util;
 
 import com.moj.notificationservice.Enums.TwoFactorType;
-import lombok.experimental.UtilityClass;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-@UtilityClass
-public class GetMessageByTwoFactorType {
+@Component
+public class GetMessage {
     private static final int EXPIRATION_MINUTES = 15;
-
-    public String getMessage(
+    private String websiteUrl;
+    public GetMessage(
+            @Value("${WEBSITE_URL}") String websiteUrl
+    ) {
+        this.websiteUrl = websiteUrl;
+    }
+    public String getMessageByTwoFactor(
             TwoFactorType twoFactorType,
             Integer verificationCode
     ) {
@@ -32,5 +38,18 @@ public class GetMessageByTwoFactorType {
         throw new IllegalArgumentException(
                 "Unsupported two-factor type: " + twoFactorType
         );
+    }
+    public String getMessageByPasswordReset(String resetToken) {
+        String resetLink =
+                websiteUrl
+                        + "/reset-password?token="
+                        + resetToken;
+
+        return "We received a request to reset your password. "
+                + "Click the following link to reset it: "
+                + resetLink
+                + ". This link will expire in "
+                + EXPIRATION_MINUTES
+                + " minutes.";
     }
 }
