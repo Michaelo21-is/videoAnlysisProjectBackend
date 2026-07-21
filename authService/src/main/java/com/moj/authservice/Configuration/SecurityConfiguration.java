@@ -51,6 +51,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/auth/sign-in").permitAll()
                         .requestMatchers("/api/auth/refresh-token").permitAll()
                         .requestMatchers("/api/auth/set-new-password").permitAll()
+                        .requestMatchers("/api/auth/password-reset/validate").permitAll()
                         .requestMatchers("/api/auth/forgot-my-password-request").permitAll()
                         // 2FA verification is reachable ONLY with a temp token (TEMP_AUTH),
                         // never with a full access token — same rule as the gateway.

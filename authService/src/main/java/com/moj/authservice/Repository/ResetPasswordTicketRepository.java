@@ -8,5 +8,5 @@ import java.util.Optional;
 
 public interface ResetPasswordTicketRepository extends JpaRepository<ResetPasswordTicket, Long> {
     boolean existsByResetTokenAndExpirationDateAfter(byte[] resetToken, Instant expirationDate);
-    Optional<ResetPasswordTicket> findByResetTokenAndExpirationDateAfter(String resetToken, Instant expirationDate);
+    Optional<ResetPasswordTicket> findByResetTokenAndExpirationDateAfter(byte[] resetToken, Instant expirationDate);
 }

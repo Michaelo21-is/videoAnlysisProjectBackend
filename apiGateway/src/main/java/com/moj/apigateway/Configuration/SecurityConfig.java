@@ -80,8 +80,10 @@ public class SecurityConfig {
                                 "/api/auth/sign-up",
                                 "/api/auth/sign-in",
                                 "/api/auth/forgot-my-password-request",
-                                "/api/auth/set-new-password"
-                                ,"api/auth/refresh-token"
+                                "/api/auth/set-new-password",
+                                "/api/auth/password-reset/validate",
+                                "/api/auth/refresh-token"
+
                         )
                         .permitAll()
 
