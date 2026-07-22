@@ -64,6 +64,7 @@ services:
     ports:
       - "8081:8081"
     environment:
+      WEBSITE_URL: ${WEBSITE_URL}
       # RabbitMQ (Spring relaxed binding: SPRING_RABBITMQ_* -> spring.rabbitmq.*)
       SPRING_RABBITMQ_HOST: ${RABBITMQ_HOST}
       SPRING_RABBITMQ_PORT: ${RABBITMQ_PORT}

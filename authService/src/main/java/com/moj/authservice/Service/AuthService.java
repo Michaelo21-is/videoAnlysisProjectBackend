@@ -199,12 +199,16 @@ public class AuthService {
         rabbitTemplate.convertAndSend(RabbitMqConfig.AUTH_NOTIFICATION_EXCHANGE, RabbitMqConfig.PASSWORD_RESET_ROUTING_KEY, resetPasswordResponse);
 
         byte[] hashedToken = GenerateResetToken.hashToken(resetToken);
-
-        ResetPasswordTicket resetPasswordTicket = ResetPasswordTicket.builder()
-                .users(user)
-                .resetToken(hashedToken)
-                .expirationDate(Instant.now().plus(15, ChronoUnit.MINUTES))
-                .build();
+        ResetPasswordTicket resetPasswordTicket =
+                resetPasswordTicketRepository
+                        .findByUsersId(user.getId())
+                        .orElseGet(() ->
+                                ResetPasswordTicket.builder()
+                                        .users(user)
+                                        .build()
+                        );
+        resetPasswordTicket.setResetToken(hashedToken);
+        resetPasswordTicket.setExpirationDate(Instant.now().plus(15, ChronoUnit.MINUTES));
         resetPasswordTicketRepository.save(resetPasswordTicket);
 
         return RegularResponse.builder()
@@ -230,7 +234,7 @@ public class AuthService {
                     .build();
         }
         byte[] hashResetToken = GenerateResetToken.hashToken(resetToken);
-        ResetPasswordTicket resetPasswordTicket = resetPasswordTicketRepository.findByResetTokenAndExpirationDateAfter(hashResetToken, Instant.now())
+        ResetPasswordTicket resetPasswordTicket = resetPasswordTicketRepository.findByResetToken(hashResetToken)
                 .orElseThrow(() ->   new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Reset token is invalid or expired"));
         if (newPassword.length() < 6){
             return RegularResponse.builder()
@@ -238,9 +242,16 @@ public class AuthService {
                     .status(HttpStatus.BAD_REQUEST)
                     .build();
         }
+        if (!resetPasswordTicket.getExpirationDate().isAfter(Instant.now())){
+            return RegularResponse.builder()
+                    .message("reset token has expired")
+                    .status(HttpStatus.GONE)
+                    .build();
+        }
         String encodedPassword = passwordEncoder.encode(newPassword);
         resetPasswordTicket.getUsers().setPassword(encodedPassword);
         usersRepository.save(resetPasswordTicket.getUsers());
+        jwtService.deleteToken(resetPasswordTicket.getUsers().getId());
         resetPasswordTicketRepository.delete(resetPasswordTicket);
         return RegularResponse.builder()
                 .message("password reset successful")

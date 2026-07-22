@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class GetMessage {
     private static final int EXPIRATION_MINUTES = 15;
-    private String websiteUrl;
+    private final String websiteUrl;
     public GetMessage(
             @Value("${WEBSITE_URL}") String websiteUrl
     ) {
@@ -42,7 +42,7 @@ public class GetMessage {
     public String getMessageByPasswordReset(String resetToken) {
         String resetLink =
                 websiteUrl
-                        + "/reset-password?token="
+                        + "/set-password/"
                         + resetToken;
 
         return "We received a request to reset your password. "
