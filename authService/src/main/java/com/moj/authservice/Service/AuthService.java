@@ -14,6 +14,7 @@ import com.moj.authservice.Repository.ResetPasswordTicketRepository;
 import com.moj.authservice.Repository.TwoFactorRepository;
 import com.moj.authservice.Repository.UsersRepository;
 import com.moj.authservice.Response.*;
+import com.moj.authservice.Util.ExtractIpFromClient;
 import com.moj.authservice.Util.FormatBlockTime;
 import com.moj.authservice.Util.GenerateResetToken;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,21 +43,22 @@ public class AuthService {
     private final RabbitTemplate rabbitTemplate;
     private final JwtService jwtService;
     private final ResetPasswordTicketRepository resetPasswordTicketRepository;
-    private final AttemptService attemptService;
-    // Request-scoped proxy: lets sign-in read the caller's address without changing the
-    // controller signature. Only touched from signIn(), which always runs inside a request.
+    private final LoginAttemptService loginAttemptService;
+    private final ResetPasswordAttemptService resetPasswordAttemptService;
     private final HttpServletRequest request;
 
     public AuthService(UsersRepository usersRepository, PasswordEncoder passwordEncoder, ResetPasswordTicketRepository resetPasswordTicketRepository
-            , TwoFactorRepository twoFactorRepository, RabbitTemplate rabbitTemplate, JwtService jwtService, AttemptService attemptService, HttpServletRequest request) {
+            , TwoFactorRepository twoFactorRepository, RabbitTemplate rabbitTemplate, JwtService jwtService,
+                       LoginAttemptService loginAttemptService, HttpServletRequest request, ResetPasswordAttemptService resetPasswordAttemptService) {
         this.usersRepository = usersRepository;
         this.passwordEncoder = passwordEncoder;
         this.twoFactorRepository = twoFactorRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.jwtService = jwtService;
         this.resetPasswordTicketRepository = resetPasswordTicketRepository;
-        this.attemptService = attemptService;
+        this.loginAttemptService = loginAttemptService;
         this.request = request;
+        this.resetPasswordAttemptService = resetPasswordAttemptService;
     }
     @Transactional
     public TempTokenResponse signUp(SignUpDto signUpDto){
@@ -99,9 +101,9 @@ public class AuthService {
 
     @Transactional
     public SignInResponse signIn(SignInDto signInDto){
-        String ip = LoginFailureHandler.extractClientIp(request);
+        String ip = ExtractIpFromClient.extractClientIp(request);
 
-        Optional<Duration> blockTime = attemptService.getRemainingBlockTime(ip);
+        Optional<Duration> blockTime = loginAttemptService.getRemainingBlockTime(ip);
         if (blockTime.isPresent()) {
             String formattedBlockTime = FormatBlockTime.formatBlockTime(blockTime.get());
             return SignInResponse.builder()
@@ -111,10 +113,7 @@ public class AuthService {
         }
 
         /*
-         * Every invalid-credential case throws the same BadCredentialsException. Spring Security's
-         * ExceptionTranslationFilter catches it on the way out of the controller and calls
-         * LoginFailureHandler, which is what records the failed attempt in Redis — this service
-         * never invokes the handler itself.
+         * if it fails spring boot security is deploying badCredntaials and from there is saving the attempt of user
          */
         if (signInDto.getPassword() == null || signInDto.getPassword().length() < 6){
             throw new BadCredentialsException(LoginFailureHandler.INVALID_CREDENTIALS_MESSAGE);
@@ -126,7 +125,7 @@ public class AuthService {
             }
 
         // The credentials were correct, so the IP starts again from a clean slate.
-        attemptService.clearFailedAttempts(ip);
+        loginAttemptService.clearFailedAttempts(ip);
 
         if (!user.isUserVerifiedEmail()){
             setTwoFactor(user.getId(), TwoFactorType.EMAILVERIFICATION);
@@ -207,24 +206,36 @@ public class AuthService {
 
     @Transactional
     public RegularResponse restPasswordRequest(String email){
+        // checking if the user didnt hit the limit of reset password request
+        String ip = ExtractIpFromClient.extractClientIp(request);
+        Optional<Duration> blockTime = resetPasswordAttemptService.getRemainingBlockTime(ip);
+        if (blockTime.isPresent()) {
+            String formattedBlockTime = FormatBlockTime.formatBlockTimeForReset(blockTime.get());
+            return RegularResponse.builder()
+                    .message("Too many reset password attempts. Try again in " + formattedBlockTime)
+                    .status(HttpStatus.TOO_MANY_REQUESTS)
+                    .build();
+        }
+        Optional<Duration> newBlock = resetPasswordAttemptService.trackResetAttempt(ip);
+        if (newBlock.isPresent()) {String formattedBlockTime = FormatBlockTime.formatBlockTimeForReset(newBlock.get());
+            return RegularResponse.builder()
+                    .message("Too many password reset requests. Try again in " + formattedBlockTime)
+                    .status(HttpStatus.TOO_MANY_REQUESTS)
+                    .build();
+        }
+
+
         Users user = usersRepository.findUserByEmail(email)
                 .orElse(null);
         if (user == null){
             return RegularResponse.builder()
-                    .message("user with this email does not exist")
+                    .message("No account was found with this email address.")
                     .status(HttpStatus.UNAUTHORIZED)
                     .build();
         }
 
         String resetToken = GenerateResetToken.generateResetToken();
-
-        ResetPasswordResponse resetPasswordResponse = ResetPasswordResponse.builder()
-                .email(email)
-                .resetToken(resetToken)
-                .build();
-
-        rabbitTemplate.convertAndSend(RabbitMqConfig.AUTH_NOTIFICATION_EXCHANGE, RabbitMqConfig.PASSWORD_RESET_ROUTING_KEY, resetPasswordResponse);
-
+        // saving in the database
         byte[] hashedToken = GenerateResetToken.hashToken(resetToken);
         ResetPasswordTicket resetPasswordTicket =
                 resetPasswordTicketRepository
@@ -237,6 +248,13 @@ public class AuthService {
         resetPasswordTicket.setResetToken(hashedToken);
         resetPasswordTicket.setExpirationDate(Instant.now().plus(15, ChronoUnit.MINUTES));
         resetPasswordTicketRepository.save(resetPasswordTicket);
+        // sending it to notification service
+        ResetPasswordResponse resetPasswordResponse = ResetPasswordResponse.builder()
+                .email(email)
+                .resetToken(resetToken)
+                .build();
+
+        rabbitTemplate.convertAndSend(RabbitMqConfig.AUTH_NOTIFICATION_EXCHANGE, RabbitMqConfig.PASSWORD_RESET_ROUTING_KEY, resetPasswordResponse);
 
         return RegularResponse.builder()
                 .message("password reset request sent successfully")

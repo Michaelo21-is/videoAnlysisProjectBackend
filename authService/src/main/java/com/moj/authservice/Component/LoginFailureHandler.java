@@ -1,7 +1,8 @@
 package com.moj.authservice.Component;
 
 import com.moj.authservice.Response.SignInResponse;
-import com.moj.authservice.Service.AttemptService;
+import com.moj.authservice.Service.LoginAttemptService;
+import com.moj.authservice.Util.ExtractIpFromClient;
 import com.moj.authservice.Util.FormatBlockTime;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,22 +28,17 @@ public class LoginFailureHandler implements AuthenticationFailureHandler, Authen
     /** Same message for every invalid-credential case, so the endpoint cannot enumerate accounts. */
     public static final String INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
 
-    private final AttemptService attemptService;
+    private final LoginAttemptService loginAttemptService;
     // Boot's auto-configured mapper, so the body is serialized exactly like a controller response.
     private final ObjectMapper objectMapper;
 
-    public LoginFailureHandler(AttemptService attemptService, ObjectMapper objectMapper) {
-        this.attemptService = attemptService;
+    public LoginFailureHandler(LoginAttemptService loginAttemptService, ObjectMapper objectMapper) {
+        this.loginAttemptService = loginAttemptService;
         this.objectMapper = objectMapper;
     }
 
 
-    public static String extractClientIp(HttpServletRequest request) {
-        return Optional.ofNullable(request.getHeader("X-Forwarded-For"))
-                .map(header -> header.split(",")[0].trim())
-                .filter(ip -> !ip.isEmpty())
-                .orElse(request.getRemoteAddr());
-    }
+
 
     @Override
     public void commence(HttpServletRequest request,
@@ -66,9 +62,9 @@ public class LoginFailureHandler implements AuthenticationFailureHandler, Authen
             return;
         }
 
-        String ip = extractClientIp(request);
+        String ip = ExtractIpFromClient.extractClientIp(request);
 
-        Optional<Duration> blockDuration = attemptService.trackFailedAttempt(ip);
+        Optional<Duration> blockDuration = loginAttemptService.trackFailedAttempt(ip);
 
         if (blockDuration.isPresent()) {
             writeBlocked(response, blockDuration.get());

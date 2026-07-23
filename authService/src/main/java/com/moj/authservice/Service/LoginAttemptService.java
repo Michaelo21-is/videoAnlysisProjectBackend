@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Service
-public class AttemptService {
+public class LoginAttemptService {
 
     // Redis key prefixes
     private static final String LOGIN_FAILURE_KEY_PREFIX = "login:fail:";
@@ -34,7 +34,7 @@ public class AttemptService {
 
     private final StringRedisTemplate redis;
 
-    public AttemptService(StringRedisTemplate redis) {
+    public LoginAttemptService(StringRedisTemplate redis) {
         this.redis = redis;
     }
 
@@ -57,12 +57,7 @@ public class AttemptService {
          * Set the expiration only on the first failed attempt.
          * This creates a fixed 15-minute attempt window.
          */
-        if (attempts == 1) {
-            redis.expire(
-                    failureKey,
-                    ATTEMPT_WINDOW
-            );
-        }
+        if (attempts == 1) {redis.expire(failureKey, ATTEMPT_WINDOW);}
 
         /*
          * Block only when the counter reaches the exact limit.
