@@ -1,5 +1,6 @@
 package com.moj.authservice.Configuration;
 
+import com.moj.authservice.Component.LoginFailureHandler;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -7,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,9 +26,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfiguration {
 
     private final GatewayHeaderAuthenticationFilter gatewayHeaderAuthenticationFilter;
+    private final LoginFailureHandler loginFailureHandler;
 
-    public SecurityConfiguration(GatewayHeaderAuthenticationFilter gatewayHeaderAuthenticationFilter) {
+    public SecurityConfiguration(GatewayHeaderAuthenticationFilter gatewayHeaderAuthenticationFilter,
+                                 LoginFailureHandler loginFailureHandler) {
         this.gatewayHeaderAuthenticationFilter = gatewayHeaderAuthenticationFilter;
+        this.loginFailureHandler = loginFailureHandler;
     }
 
     @Bean
@@ -40,6 +45,16 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+                // ExceptionTranslationFilter catches every AuthenticationException thrown
+                // downstream — including the BadCredentialsException AuthService raises for
+                // invalid sign-in credentials — and hands it to this entry point. That is what
+                // triggers LoginFailureHandler.onAuthenticationFailure(...) automatically.
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(loginFailureHandler)
+                )
+                // Nothing to replay after login in a stateless JSON API, and the default
+                // HttpSessionRequestCache would create a session when the entry point fires.
+                .requestCache(RequestCacheConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         // Error responses (4xx/5xx) are rendered via a container ERROR
                         // dispatch to /error. Spring Security authorizes that dispatch

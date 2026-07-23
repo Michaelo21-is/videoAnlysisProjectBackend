@@ -37,7 +37,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-
+      #Redis
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
       # PostgreSQL (referenced by application.properties)
       DATABASE_URL: ${DATABASE_URL}
       DATABASE_USERNAME: ${DATABASE_USERNAME}
@@ -137,8 +139,16 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - loki
+  redis-cache:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
 
 volumes:
+  redis_data:
   postgres-data:
   loki-data:
   alloy-data:

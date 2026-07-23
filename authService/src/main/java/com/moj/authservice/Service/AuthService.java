@@ -1,5 +1,6 @@
 package com.moj.authservice.Service;
 
+import com.moj.authservice.Component.LoginFailureHandler;
 import com.moj.authservice.Configuration.RabbitMqConfig;
 import com.moj.authservice.Dto.SignInDto;
 import com.moj.authservice.Dto.SignUpDto;
@@ -13,18 +14,23 @@ import com.moj.authservice.Repository.ResetPasswordTicketRepository;
 import com.moj.authservice.Repository.TwoFactorRepository;
 import com.moj.authservice.Repository.UsersRepository;
 import com.moj.authservice.Response.*;
+import com.moj.authservice.Util.FormatBlockTime;
 import com.moj.authservice.Util.GenerateResetToken;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -36,15 +42,21 @@ public class AuthService {
     private final RabbitTemplate rabbitTemplate;
     private final JwtService jwtService;
     private final ResetPasswordTicketRepository resetPasswordTicketRepository;
+    private final AttemptService attemptService;
+    // Request-scoped proxy: lets sign-in read the caller's address without changing the
+    // controller signature. Only touched from signIn(), which always runs inside a request.
+    private final HttpServletRequest request;
 
     public AuthService(UsersRepository usersRepository, PasswordEncoder passwordEncoder, ResetPasswordTicketRepository resetPasswordTicketRepository
-            , TwoFactorRepository twoFactorRepository, RabbitTemplate rabbitTemplate, JwtService jwtService) {
+            , TwoFactorRepository twoFactorRepository, RabbitTemplate rabbitTemplate, JwtService jwtService, AttemptService attemptService, HttpServletRequest request) {
         this.usersRepository = usersRepository;
         this.passwordEncoder = passwordEncoder;
         this.twoFactorRepository = twoFactorRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.jwtService = jwtService;
         this.resetPasswordTicketRepository = resetPasswordTicketRepository;
+        this.attemptService = attemptService;
+        this.request = request;
     }
     @Transactional
     public TempTokenResponse signUp(SignUpDto signUpDto){
@@ -87,21 +99,34 @@ public class AuthService {
 
     @Transactional
     public SignInResponse signIn(SignInDto signInDto){
-        if (signInDto.getPassword().length() < 6){
+        String ip = LoginFailureHandler.extractClientIp(request);
+
+        Optional<Duration> blockTime = attemptService.getRemainingBlockTime(ip);
+        if (blockTime.isPresent()) {
+            String formattedBlockTime = FormatBlockTime.formatBlockTime(blockTime.get());
             return SignInResponse.builder()
-                    .message("password must be at least 6 characters")
-                    .status(HttpStatus.UNAUTHORIZED)
+                    .message("Too many login attempts. Try again in " + formattedBlockTime)
+                    .status(HttpStatus.TOO_MANY_REQUESTS)
                     .build();
+        }
+
+        /*
+         * Every invalid-credential case throws the same BadCredentialsException. Spring Security's
+         * ExceptionTranslationFilter catches it on the way out of the controller and calls
+         * LoginFailureHandler, which is what records the failed attempt in Redis — this service
+         * never invokes the handler itself.
+         */
+        if (signInDto.getPassword() == null || signInDto.getPassword().length() < 6){
+            throw new BadCredentialsException(LoginFailureHandler.INVALID_CREDENTIALS_MESSAGE);
         }
         Users user = usersRepository.findUserByEmail(signInDto.getEmail())
         .orElse(null);
         if (user == null || !passwordEncoder.matches(signInDto.getPassword(), user.getPassword())) {
-            return SignInResponse.builder()
-                    .message("Invalid email or password")
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .build();
+            throw new BadCredentialsException(LoginFailureHandler.INVALID_CREDENTIALS_MESSAGE);
             }
 
+        // The credentials were correct, so the IP starts again from a clean slate.
+        attemptService.clearFailedAttempts(ip);
 
         if (!user.isUserVerifiedEmail()){
             setTwoFactor(user.getId(), TwoFactorType.EMAILVERIFICATION);
@@ -132,6 +157,8 @@ public class AuthService {
         TwoFactor twoFactor = twoFactorRepository.findByUsersId(userId).
                 orElseThrow(() -> new IllegalStateException("Two-factor record was not found for user: " + userId));
         if (twoFactor.getTwoFactorCode().equals(twoFactorCode) && twoFactor.getExpirationDate().isAfter(Instant.now())){
+            twoFactor.getUsers().setUserVerifiedEmail(true);
+            usersRepository.save(twoFactor.getUsers());
             String accessToken = jwtService.generateToken(twoFactor.getUsers(), TokenType.ACCESS);
             String refreshToken = jwtService.generateToken(twoFactor.getUsers(), TokenType.REFRESH);
             jwtService.saveToken(refreshToken, twoFactor.getUsers());
