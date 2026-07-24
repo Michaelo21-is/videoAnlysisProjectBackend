@@ -19,9 +19,10 @@ public class Jwt {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Long id;
-
+    @Column(nullable = false, name = "refresh_token" )
     private String refreshToken;
 
+    @Column(nullable = false, name = "expiration_date")
     private Instant expirationDate;
 
     @OneToOne

@@ -1,4 +1,4 @@
-package com.moj.authservice.Enums;
+package com.moj.userservice.Enums;
 
 public enum SubscriptionType {
     BASIC,

@@ -78,6 +78,15 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+  user-service:
+    build: ./userService
+    container_name: user-service
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
 
   api-gateway:
     build: ./apiGateway
@@ -86,9 +95,10 @@ services:
       - "8762:8762"
     environment:
       # Internal Docker service URL for routing (application.yml -> AUTH_SERVICE_URL)
-      AUTH_SERVICE_URL: http://auth-service:8080
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      USER_SERVICE_URL: ${USER_SERVICE_URL}
       # Allowed CORS origin (application.yml globalcors -> WEBSITE_URL)
-      WEBSITE_URL: ${WEBSITE_URL:-http://localhost:3000}
+      WEBSITE_URL: ${WEBSITE_URL}
       # Same HS256 secret auth-service signs tokens with (application.yml -> jwt.secret-key)
       JWT_SECRET_KEY: ${SECURITY_JWT_SECRET_KEY}
     depends_on:

@@ -27,8 +27,10 @@ public class ResetPasswordTicket {
     )
     private Long id;
 
+    @Column(nullable = false, name = "reset_token")
     private byte[] resetToken;
 
+    @Column(nullable = false, name = "expiration_date")
     private Instant expirationDate;
 
     @OneToOne

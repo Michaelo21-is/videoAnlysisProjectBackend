@@ -11,10 +11,13 @@ spring:
         webflux:
           routes:
             - id: auth-service-route
-              uri: ${AUTH_SERVICE_URL:http://localhost:8080}
+              uri: ${AUTH_SERVICE_URL}
               predicates:
                 - Path=/api/auth/**
-
+            - id: user-service-route
+              uri: ${USER_SERVICE_URL}
+              predicates:
+                - path=/api/user/**
 jwt:
   secret-key: ${JWT_SECRET_KEY}
 logging:

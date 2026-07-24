@@ -21,11 +21,14 @@ public class TwoFactor {
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Long id;
 
+    @Column(nullable = false, name = "two_factor_code")
     private Integer twoFactorCode;
 
+    @Column(nullable = false, name = "expiration_date")
     private Instant ExpirationDate;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, name = "two_factor_type")
     private TwoFactorType twoFactorType;
 
     @OneToOne
