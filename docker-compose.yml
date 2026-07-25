@@ -1,7 +1,7 @@
 services:
-  postgres:
+  auth-postgres:
     image: postgres:17
-    container_name: postgres
+    container_name: auth-postgres
     environment:
       POSTGRES_DB: auth_db
       POSTGRES_USER: ${DATABASE_USERNAME}
@@ -9,9 +9,34 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - auth-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d auth_db"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DATABASE_USERNAME} -d auth_db"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  purchase-postgres:
+    image: postgres:17
+    container_name: purchase-postgres
+    environment:
+      POSTGRES_DB: purchase_db
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - purchase-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DATABASE_USERNAME} -d purchase_db"
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,7 +66,7 @@ services:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       # PostgreSQL (referenced by application.properties)
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${AUTH_DATABASE_URL}
       DATABASE_USERNAME: ${DATABASE_USERNAME}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       # RabbitMQ (Spring relaxed binding: SPRING_RABBITMQ_* -> spring.rabbitmq.*)
@@ -84,7 +109,16 @@ services:
     ports:
       - "8082:8082"
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${AUTH_DATABASE_URL}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+
+  purchase-service:
+    container_name: purchase-service
+    ports:
+      - "8083:8083"
+    environment:
+      DATABASE_URL: ${PURCHASE_DATABASE_URL}
       DATABASE_USERNAME: ${DATABASE_USERNAME}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
 
@@ -159,7 +193,8 @@ services:
 
 volumes:
   redis_data:
-  postgres-data:
+  auth-postgres-data:
+  purchase-postgres-data:
   loki-data:
   alloy-data:
   grafana-data:
