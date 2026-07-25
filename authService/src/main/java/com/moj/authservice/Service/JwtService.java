@@ -103,7 +103,7 @@ public class JwtService {
 
 
 
-
+    @Transactional
     public void deleteToken(UUID userId){
         jwtRepository.deleteAllByUsersId(userId);
     }

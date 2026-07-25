@@ -24,7 +24,4 @@ public class Users {
 
     private Long creditSum;
 
-    @OneToOne
-    @JoinColumn(name = "subscription_id")
-    private Subscription subscription;
 }

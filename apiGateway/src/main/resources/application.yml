@@ -17,7 +17,7 @@ spring:
             - id: user-service-route
               uri: ${USER_SERVICE_URL}
               predicates:
-                - path=/api/user/**
+                - Path=/api/user/**
 jwt:
   secret-key: ${JWT_SECRET_KEY}
 logging:

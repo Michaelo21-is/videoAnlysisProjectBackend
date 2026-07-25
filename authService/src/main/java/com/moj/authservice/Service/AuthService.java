@@ -321,4 +321,5 @@ public class AuthService {
 
         return jwtService.renewAccessToken(refreshToken);
     }
+    public void signOut(UUID userId){jwtService.deleteToken(userId);}
 }

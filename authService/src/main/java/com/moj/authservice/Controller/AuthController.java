@@ -11,6 +11,7 @@ import com.moj.authservice.Response.TempTokenResponse;
 import com.moj.authservice.Service.AuthService;
 import com.moj.authservice.Service.JwtService;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -145,5 +146,17 @@ public class AuthController {
         return ResponseEntity
                 .status(response.getStatus())
                 .body(response.getMessage());
+    }
+    @DeleteMapping("/sign-out")
+    public ResponseEntity<?> signOut(@RequestHeader("X-USER-ID") UUID userId){
+        authService.signOut(userId);
+        ResponseCookie clearTempCookie = cookieUtil.deleteCookie(CookieUtil.tempToken);
+        ResponseCookie clearAccessCookie = cookieUtil.deleteCookie(CookieUtil.accessToken);
+        ResponseCookie clearRefreshCookie = cookieUtil.deleteCookie(CookieUtil.refreshToken);
+        return ResponseEntity.status(HttpStatus.OK)
+                .header(HttpHeaders.SET_COOKIE, clearTempCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, clearAccessCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, clearRefreshCookie.toString())
+                .body("signed out successfully");
     }
 }

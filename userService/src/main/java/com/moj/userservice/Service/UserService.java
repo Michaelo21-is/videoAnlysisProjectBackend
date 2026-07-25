@@ -27,6 +27,7 @@ public class UserService {
 
         return UserDetailsResponse.builder()
                 .fullName(user.getFullName())
+                .email(user.getEmail())
                 .creditSum(user.getCreditSum())
                 .build();
     }
