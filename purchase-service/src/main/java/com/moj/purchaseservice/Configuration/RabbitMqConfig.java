@@ -21,6 +21,10 @@ public class RabbitMqConfig {
     public static final String ORDER_ANALYZE_CONTENT_QUEUE = "order-analyze-content-queue";
     public static final String ORDER_ANALYZE_CONTENT_ROUTING_KEY = "order.analyze.content";
 
+    public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
+    public static final String ORDER_CREDIT_EXCHANGE = "order-credit-exchange";
+    public static final String ORDER_CREDIT_ROUTING_KEY = "order.credit";
+
     @Bean
     public Queue orderAnalyzeContentStatusQueue() {
         return QueueBuilder
@@ -48,6 +52,25 @@ public class RabbitMqConfig {
                 .to(exchange)
                 .with(ORDER_ANALYZE_CONTENT_ROUTING_KEY);
     }
+
+    @Bean
+    public DirectExchange orderCreditExchange() {return new DirectExchange(ORDER_CREDIT_EXCHANGE);}
+
+    @Bean
+    public Queue orderCreditQueue() {
+        return QueueBuilder
+                .durable(ORDER_CREDIT_QUEUE)
+                .build();
+    }
+
+    @Bean
+    public Binding orderCreditBinding(@Qualifier("orderCreditQueue") Queue queue, @Qualifier("orderCreditExchange") DirectExchange exchange) {
+        return BindingBuilder
+                .bind(queue)
+                .to(exchange)
+                .with(ORDER_CREDIT_ROUTING_KEY);
+    }
+
 
     @Bean
     public MessageConverter messageConverter() {

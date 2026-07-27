@@ -4,22 +4,30 @@ import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Response.OrderAnalyzeStatusResponse;
 import com.moj.purchaseservice.enums.Status;
 import lombok.experimental.UtilityClass;
-import org.springframework.http.HttpStatus;
 
 @UtilityClass
 public class CheckOrderStatus {
-    private OrderAnalyzeStatusResponse createStatusResponse(OrderAnalyzeContents order) {
+
+    public OrderAnalyzeStatusResponse createStatusResponse(
+            OrderAnalyzeContents order
+    ) {
         return switch (order.getStatus()) {
             case PURCHASED -> OrderAnalyzeStatusResponse.builder()
                     .orderId(order.getId())
                     .status(Status.SUCCEED)
-                    .message("Order analyze content succeeded")
+                    .message("Order content analysis succeeded")
+                    .build();
+
+            case PAYMENT_FAILED -> OrderAnalyzeStatusResponse.builder()
+                    .orderId(order.getId())
+                    .status(Status.PAYMENT_FAILED)
+                    .message("Not enough credits in your account")
                     .build();
 
             default -> OrderAnalyzeStatusResponse.builder()
                     .orderId(order.getId())
-                    .status(HttpStatus.EXPECTATION_FAILED)
-                    .message("Order analyze content have been failed check your credit balance")
+                    .status(Status.SERVER_FAILED)
+                    .message("Something went wrong with our server. Please try again later.")
                     .build();
         };
     }

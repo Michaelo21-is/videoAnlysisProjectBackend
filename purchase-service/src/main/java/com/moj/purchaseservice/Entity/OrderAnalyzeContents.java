@@ -39,7 +39,7 @@ public class OrderAnalyzeContents {
     @Column(name = "credit_cost", nullable = false)
     private Long creditCost;
 
-    @Column(name = "purchased_at", nullable = false)
+    @Column(name = "purchased_at")
     private Instant purchasedAt;
 
     @Enumerated(EnumType.STRING)

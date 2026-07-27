@@ -3,6 +3,7 @@ package com.moj.purchaseservice.Service;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
 import com.moj.purchaseservice.Response.OrderAnalyzeStatusResponse;
+import com.moj.purchaseservice.Utils.CheckOrderStatus;
 import com.moj.purchaseservice.enums.OrderAnalyzeVideoStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -117,16 +118,15 @@ public class SseService {
         SseEmitter emitter = orderStatus(orderId);
 
         if (order.getStatus() == OrderAnalyzeVideoStatus.PURCHASED) {
-
-            OrderAnalyzeStatusResponse response = createStatusResponse(order);
-
-            sendFinalStatus(
-                    orderId,
-                    response
-            );
+            // checking if already got the message from user service
+            OrderAnalyzeStatusResponse response = CheckOrderStatus.createStatusResponse(order);
+            // sending it to the front
+            sendFinalStatus(orderId, response);
         }
 
         return emitter;
     }
-
+    /// ***
+    /// order analyze content sse
+    /// ***
 }

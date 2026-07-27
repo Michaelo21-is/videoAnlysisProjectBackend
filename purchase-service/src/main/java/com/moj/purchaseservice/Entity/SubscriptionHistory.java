@@ -19,6 +19,7 @@ import java.util.UUID;
 public class SubscriptionHistory {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @Column(nullable = false)
     private Long Id;
 
     private UUID userId;
@@ -27,6 +28,6 @@ public class SubscriptionHistory {
     @Column(name = "subscription_type", nullable = false)
     private SubscriptionType subscriptionType;
 
-    @Column(name = "purchased_at", nullable = false)
+    @Column(name = "purchased_at")
     private Instant purchasedAt;
 }

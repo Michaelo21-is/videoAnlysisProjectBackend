@@ -30,4 +30,9 @@ public class PurchaseController {
     public SseEmitter getAnalyzeContentStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
         return sseService.OrderAnalyzeStatusSSE(orderId, userId);
     }
+    @PostMapping("/order-credit-request")
+    public ResponseEntity<?> orderCredit(@RequestHeader("X-USER-ID") UUID userId, @RequestBody com.moj.purchaseservice.Dto.OrderCreditDto orderCredit) {
+        Long orderId = purchaseService.orderCredit(userId, orderCredit);
+        return ResponseEntity.accepted().body(orderId);
+    }
 }
