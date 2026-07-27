@@ -1,12 +1,13 @@
 package com.moj.userservice.Utils;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
-import com.moj.userservice.Enums.Status;
-import com.moj.userservice.Response.PurchaseResponse;
+import com.moj.userservice.Dto.OrderCreditDto;
+import com.moj.userservice.Enums.AnalyzeOrderStatus;
+import com.moj.userservice.Enums.OrderCreditStatus;
+import com.moj.userservice.Response.OrderCreditResponse;
+import com.moj.userservice.Response.PurchaseWithCreditResponse;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
-
-import java.util.UUID;
 
 @Component
 public class SendToQueue {
@@ -14,11 +15,11 @@ public class SendToQueue {
     public SendToQueue(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
     }
-    public void sendOrderStatus(Long orderId, UUID userId, Status status) {
-        PurchaseResponse response =
-                PurchaseResponse.builder()
+    public void sendOrderStatus(Long orderId, AnalyzeOrderStatus analyzeOrderStatus) {
+        PurchaseWithCreditResponse response =
+                PurchaseWithCreditResponse.builder()
                         .orderId(orderId)
-                        .status(status)
+                        .analyzeOrderStatus(analyzeOrderStatus)
                         .build();
 
         rabbitTemplate.convertAndSend(
@@ -26,5 +27,16 @@ public class SendToQueue {
                 RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY,
                 response
         );
+    }
+    public void sendOrderCreditStatus(OrderCreditDto orderCreditDto, OrderCreditStatus  orderCreditStatus) {
+        OrderCreditResponse response = OrderCreditResponse.builder()
+                .orderId(orderCreditDto.getOrderId())
+                .creditAdded(orderCreditDto.getCredit())
+                .priceInUsd(orderCreditDto.getPriceInUsd())
+                .email(orderCreditDto.getEmail())
+                .fullName(orderCreditDto.getFullName())
+                .orderCreditStatus(orderCreditStatus)
+                .build();
+
     }
 }

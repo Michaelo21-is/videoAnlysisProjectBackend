@@ -2,8 +2,10 @@ package com.moj.userservice.Service;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
 import com.moj.userservice.Dto.OrderAnalyzeDto;
+import com.moj.userservice.Dto.OrderCreditDto;
 import com.moj.userservice.Entity.Users;
-import com.moj.userservice.Enums.Status;
+import com.moj.userservice.Enums.AnalyzeOrderStatus;
+import com.moj.userservice.Enums.OrderCreditStatus;
 import com.moj.userservice.Repository.UserRepository;
 import com.moj.userservice.Response.UserDetailsResponse;
 import com.moj.userservice.Utils.SendToQueue;
@@ -52,8 +54,7 @@ public class UserService {
 
             sendToQueue.sendOrderStatus(
                     orderAnalyzeDto != null ? orderAnalyzeDto.getOrderId() : null,
-                    orderAnalyzeDto != null ? orderAnalyzeDto.getUserId() : null,
-                    Status.SERVER_FAILED
+                    AnalyzeOrderStatus.SERVER_FAILED
             );
             return;
         }
@@ -64,8 +65,7 @@ public class UserService {
         if (user == null) {
             sendToQueue.sendOrderStatus(
                     orderAnalyzeDto.getOrderId(),
-                    orderAnalyzeDto.getUserId(),
-                    Status.SERVER_FAILED
+                    AnalyzeOrderStatus.SERVER_FAILED
             );
             return;
         }
@@ -74,8 +74,7 @@ public class UserService {
 
             sendToQueue.sendOrderStatus(
                     orderAnalyzeDto.getOrderId(),
-                    orderAnalyzeDto.getUserId(),
-                    Status.PAYMENT_FAILED
+                    AnalyzeOrderStatus.PAYMENT_FAILED
             );
             return;
         }
@@ -87,11 +86,28 @@ public class UserService {
 
         sendToQueue.sendOrderStatus(
                 orderAnalyzeDto.getOrderId(),
-                orderAnalyzeDto.getUserId(),
-                Status.SUCCEED
+                AnalyzeOrderStatus.SUCCEED
         );
     }
 
+    @RabbitListener(queues = RabbitMqConfig.ORDER_CREDIT_QUEUE)
+    @Transactional
+    public void handleOrderCredit(OrderCreditDto orderCreditDto) {
+        if (orderCreditDto.getCredit() == null || orderCreditDto.getEmail() == null || orderCreditDto.getFullName() == null
+                || orderCreditDto.getPriceInUsd() == null || orderCreditDto.getUserId() == null) {
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED);
+        }
+        Users user = userRepository.findById(orderCreditDto.getUserId())
+                .orElse(null);
+        if (user == null) {
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED);
+        }
+        int updateRow = userRepository.addCredit(orderCreditDto.getUserId(), orderCreditDto.getCredit());
+        if (updateRow == 0) {
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED);
+        }
+        sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SUCCEED);
+    }
 
     /// ***
     /// purchase area

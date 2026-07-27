@@ -4,6 +4,8 @@ import com.moj.notificationservice.Enums.TwoFactorType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+
 @Component
 public class GetMessage {
     private static final int EXPIRATION_MINUTES = 15;
@@ -52,4 +54,5 @@ public class GetMessage {
                 + EXPIRATION_MINUTES
                 + " minutes.";
     }
+    public String getMessageByOrderCredit(String FullName, Long credit, BigDecimal priceInUsd) {}
 }
