@@ -18,7 +18,7 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "order_analyze_content")
-public class OrderAnalyzeVideos {
+public class OrderAnalyzeContents {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
