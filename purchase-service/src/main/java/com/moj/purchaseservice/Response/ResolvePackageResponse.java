@@ -6,17 +6,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
-@Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Data
 @Builder
-public class OrderCreditResponse {
-    private Long orderId;
-    private String email;
-    private String FullName;
-    private Long credit;
+public class ResolvePackageResponse {
     private BigDecimal priceInUsd;
-    private UUID userId;
+    private Long credit;
 }

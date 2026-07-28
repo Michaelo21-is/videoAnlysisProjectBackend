@@ -16,13 +16,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class SseService {
+public class SseOrderAnalyzeContentService {
 
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>(); // holding all the order id connetion here
     private final OrderAnalyzeContentsRepository orderAnalyzeContentsRepository;
 
-    public SseService(OrderAnalyzeContentsRepository orderAnalyzeContentsRepository) {
+    public SseOrderAnalyzeContentService(OrderAnalyzeContentsRepository orderAnalyzeContentsRepository) {
         this.orderAnalyzeContentsRepository = orderAnalyzeContentsRepository;
+
     }
 
     public SseEmitter orderStatus(Long orderId) {
@@ -129,4 +130,6 @@ public class SseService {
     /// ***
     /// order analyze content sse
     /// ***
+
+
 }

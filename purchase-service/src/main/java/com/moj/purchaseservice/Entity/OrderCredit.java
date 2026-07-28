@@ -30,11 +30,14 @@ public class OrderCredit {
     @Column(name = "price_in_usd", nullable = false)
     private BigDecimal priceInUsd;
 
-    @Column(name = "order_id", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     private OrderStatus status;
 
     @Column(name = "purchased_at")
     private Instant purchasedAt;
+
+
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;

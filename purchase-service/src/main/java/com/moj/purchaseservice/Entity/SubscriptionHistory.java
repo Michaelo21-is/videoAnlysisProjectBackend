@@ -20,7 +20,7 @@ public class SubscriptionHistory {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
     @Column(nullable = false)
-    private Long Id;
+    private Long id;
 
     private UUID userId;
 

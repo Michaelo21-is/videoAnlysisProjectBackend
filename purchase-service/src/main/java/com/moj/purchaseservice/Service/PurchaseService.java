@@ -9,14 +9,15 @@ import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
 import com.moj.purchaseservice.Repository.OrderCreditRepository;
 import com.moj.purchaseservice.Response.OrderAnalyzeResponse;
 import com.moj.purchaseservice.Response.OrderAnalyzeStatusResponse;
-import com.moj.purchaseservice.Utils.CalculateCreditToUsd;
+import com.moj.purchaseservice.Response.OrderCreditResponse;
+import com.moj.purchaseservice.Response.ResolvePackageResponse;
 import com.moj.purchaseservice.Utils.ContentPricingCalculator;
+import com.moj.purchaseservice.Utils.PaddleResolvePackage;
 import com.moj.purchaseservice.enums.*;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -24,14 +25,17 @@ import java.util.UUID;
 public class PurchaseService {
     private final RabbitTemplate rabbitTemplate;
     private final OrderAnalyzeContentsRepository orderAnalyzeContentRepository;
-    private final SseService sseService;
+    private final SseOrderAnalyzeContentService sseOrderAnalyzeContentService;
     private final OrderCreditRepository orderCreditRepository;
+    private final PaddleResolvePackage paddleResolvePackage;
     public PurchaseService(OrderAnalyzeContentsRepository orderAnalyzeContentRepository
-            , RabbitTemplate rabbitTemplate, SseService sseService, OrderCreditRepository orderCreditRepository) {
+            , RabbitTemplate rabbitTemplate, SseOrderAnalyzeContentService sseOrderAnalyzeContentService,
+               OrderCreditRepository orderCreditRepository, PaddleResolvePackage paddleResolvePackage) {
         this.orderAnalyzeContentRepository = orderAnalyzeContentRepository;
         this.rabbitTemplate = rabbitTemplate;
-        this.sseService = sseService;
+        this.sseOrderAnalyzeContentService = sseOrderAnalyzeContentService;
         this.orderCreditRepository = orderCreditRepository;
+        this.paddleResolvePackage = paddleResolvePackage;
     }
     ///
     /// order analyze content request
@@ -101,34 +105,44 @@ public class PurchaseService {
                 return;
             }
         }
-        sseService.sendFinalStatus(orderStatusDto.getOrderId(), response);
+        sseOrderAnalyzeContentService.sendFinalStatus(orderStatusDto.getOrderId(), response);
     }
     ///
     /// order analyze content request
     ///
     public Long orderCredit(UUID userId, OrderCreditDto orderCredit){
-        if (orderCredit.getCredit() < 10 || orderCredit.getEmail() == null || orderCredit.getFullName() == null) {
-            throw new RuntimeException("Invalid order credit request");
-        }
         if (userId == null) {
             throw new RuntimeException("problem with security configurations in api gateway");
         }
-        BigDecimal priceInUsd = CalculateCreditToUsd.calculateCreditToUsd(orderCredit.getCredit());
-        // api request to stripe with deatils
-
+        ResolvePackageResponse response = paddleResolvePackage.resolvePriceId(orderCredit.getProductId()) ;
         OrderCredit order = OrderCredit.builder()
-                .credit(orderCredit.getCredit())
-                .priceInUsd(priceInUsd)
+                .credit(response.getCredit())
+                .priceInUsd(response.getPriceInUsd())
                 .status(OrderStatus.PENDING)
                 .userId(userId)
                 .build();
         orderCreditRepository.save(order);
 
-        rabbitTemplate.convertAndSend(RabbitMqConfig.ORDER_CREDIT_EXCHANGE, RabbitMqConfig.ORDER_CREDIT_ROUTING_KEY, order);
 
         return order.getId();
     }
-
+    public void orderCreditPurchasedSuccessfully(Long orderId, UUID userId) {
+        OrderCredit order = orderCreditRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        if (!order.getUserId().equals(userId)) {
+            throw new RuntimeException("You cannot access this order");
+        }
+        order.setStatus(OrderStatus.PURCHASED);
+        OrderCreditResponse response = OrderCreditResponse.builder()
+                .orderId(orderId)
+                .email(order.getUserId().toString())
+                .FullName(order.getUserId().toString())
+                .credit(order.getCredit())
+                .priceInUsd(order.getPriceInUsd())
+                .userId(order.getUserId())
+                .build();
+        rabbitTemplate.convertAndSend(RabbitMqConfig.ORDER_CREDIT_EXCHANGE, RabbitMqConfig.ORDER_CREDIT_ROUTING_KEY, response);
+    }
 
     ///
     /// order credit

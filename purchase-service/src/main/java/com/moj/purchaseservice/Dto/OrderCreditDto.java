@@ -10,8 +10,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class OrderCreditDto {
-    private Long credit;
+    private String productId;
     private String email;
-    private String FullName;
+    private String fullName;
 
 }
