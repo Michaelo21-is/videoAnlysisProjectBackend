@@ -21,7 +21,8 @@ import java.util.UUID;
 public class OrderAnalyzeContents {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_analyze_content_id_generator")
+    @SequenceGenerator(name = "order_analyze_content_id_generator", sequenceName = "order_analyze_content_id_seq", allocationSize = 1)
     @Column(nullable = false)
     private Long id;
 

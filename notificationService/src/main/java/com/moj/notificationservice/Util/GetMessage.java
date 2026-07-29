@@ -54,5 +54,12 @@ public class GetMessage {
                 + EXPIRATION_MINUTES
                 + " minutes.";
     }
-    public String getMessageByOrderCredit(String FullName, Long credit, BigDecimal priceInUsd) {}
+    public String getMessageByOrderCredit(String fullName, Long credits, BigDecimal priceInUsd) {
+        return String.format(
+                "Hi %s, your order was placed successfully. You purchased %d credits for $%s.",
+                fullName,
+                credits,
+                priceInUsd.toPlainString()
+        );
+    }
 }

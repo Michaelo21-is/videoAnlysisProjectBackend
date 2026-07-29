@@ -20,7 +20,8 @@ import java.util.UUID;
 @Table(name = "order_credit")
 public class OrderCredit {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_credit_id_generator")
+    @SequenceGenerator(name = "order_credit_id_generator", sequenceName = "order_credit_id_seq", allocationSize = 1)
     @Column(nullable = false)
     private Long id;
 

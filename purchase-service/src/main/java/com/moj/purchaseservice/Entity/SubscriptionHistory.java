@@ -18,7 +18,8 @@ import java.util.UUID;
 @Table(name = "subscription_history")
 public class SubscriptionHistory {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "subscription_history_id_generator")
+    @SequenceGenerator(name = "subscription_history_id_generator", sequenceName = "subscription_history_id_seq", allocationSize = 1)
     @Column(nullable = false)
     private Long id;
 

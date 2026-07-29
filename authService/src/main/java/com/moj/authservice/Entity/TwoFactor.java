@@ -18,7 +18,8 @@ import java.util.UUID;
 @Table(name = "two_factor")
 public class TwoFactor {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "two_factor_id_generator")
+    @SequenceGenerator(name = "two_factor_id_generator", sequenceName = "two_factor_id_seq", allocationSize = 1)
     private Long id;
 
     @Column(nullable = false, name = "two_factor_code")

@@ -9,6 +9,7 @@ import com.moj.userservice.Enums.OrderCreditStatus;
 import com.moj.userservice.Repository.UserRepository;
 import com.moj.userservice.Response.UserDetailsResponse;
 import com.moj.userservice.Utils.SendToQueue;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class UserService {
     private final UserRepository userRepository;
     private final SendToQueue sendToQueue;
@@ -51,7 +53,7 @@ public class UserService {
     public void handleOrderAnalyzeContent(OrderAnalyzeDto orderAnalyzeDto) {
 
         if (orderAnalyzeDto == null || orderAnalyzeDto.getUserId() == null || orderAnalyzeDto.getCreditCost() == null) {
-
+            log.info("Order analyze content is null");
             sendToQueue.sendOrderStatus(
                     orderAnalyzeDto != null ? orderAnalyzeDto.getOrderId() : null,
                     AnalyzeOrderStatus.SERVER_FAILED
@@ -63,6 +65,7 @@ public class UserService {
                 .orElse(null);
 
         if (user == null) {
+            log.info("User not found");
             sendToQueue.sendOrderStatus(
                     orderAnalyzeDto.getOrderId(),
                     AnalyzeOrderStatus.SERVER_FAILED
@@ -71,7 +74,7 @@ public class UserService {
         }
 
         if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeDto.getCreditCost()) {
-
+            log.info("User has no enough credit");
             sendToQueue.sendOrderStatus(
                     orderAnalyzeDto.getOrderId(),
                     AnalyzeOrderStatus.PAYMENT_FAILED
@@ -93,20 +96,28 @@ public class UserService {
     @RabbitListener(queues = RabbitMqConfig.ORDER_CREDIT_QUEUE)
     @Transactional
     public void handleOrderCredit(OrderCreditDto orderCreditDto) {
-        if (orderCreditDto.getCredit() == null || orderCreditDto.getEmail() == null || orderCreditDto.getFullName() == null
+        if (orderCreditDto.getCredit() == null || orderCreditDto.getFullName() == null
                 || orderCreditDto.getPriceInUsd() == null || orderCreditDto.getUserId() == null) {
+            log.info("Order credit is null");
             sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SERVER_FAILED);
+            return;
         }
         Users user = userRepository.findById(orderCreditDto.getUserId())
                 .orElse(null);
         if (user == null) {
+            log.info("User not found");
             sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SERVER_FAILED);
+            return;
         }
         int updateRow = userRepository.addCredit(orderCreditDto.getUserId(), orderCreditDto.getCredit());
         if (updateRow == 0) {
+            log.info("Failed to add credit");
             sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED_TO_ADD_CREDIT);
+            return;
         }
-        sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SUCCEED);
+        orderCreditDto.setEmail(user.getEmail());
+        orderCreditDto.setFullName(user.getFullName());
+        sendToQueue.sendOrderCreditStatus(orderCreditDto, OrderCreditStatus.SUCCEED);
     }
 
     /// ***

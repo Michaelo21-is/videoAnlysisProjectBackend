@@ -1,10 +1,10 @@
 package com.moj.purchaseservice.Controller;
 
-import com.moj.purchaseservice.Configuration.PaddleSignatureVerifier;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
 import com.moj.purchaseservice.Service.PaddleWebHookService;
 import com.moj.purchaseservice.Service.PurchaseService;
 import com.moj.purchaseservice.Service.SseOrderAnalyzeContentService;
+import com.moj.purchaseservice.Service.SseOrderCreditService;
 import com.moj.purchaseservice.enums.ContentType;
 import com.moj.purchaseservice.enums.SumOfContent;
 import org.springframework.http.MediaType;
@@ -19,12 +19,14 @@ import java.util.UUID;
 public class PurchaseController {
     private final PurchaseService purchaseService;
     private final SseOrderAnalyzeContentService sseOrderAnalyzeContentService;
+    private final SseOrderCreditService sseOrderCreditService;
     private final PaddleWebHookService paddleWebHookService;
-    public PurchaseController(PurchaseService purchaseService
-    , SseOrderAnalyzeContentService sseOrderAnalyzeContentService, PaddleWebHookService paddleWebHookService) {
+    public PurchaseController(PurchaseService purchaseService, SseOrderAnalyzeContentService sseOrderAnalyzeContentService
+    , PaddleWebHookService paddleWebHookService, SseOrderCreditService sseOrderCreditService) {
         this.purchaseService = purchaseService;
         this.sseOrderAnalyzeContentService = sseOrderAnalyzeContentService;
         this.paddleWebHookService = paddleWebHookService;
+        this.sseOrderCreditService = sseOrderCreditService;
     }
     @PostMapping("/analyze-content-request")
     public ResponseEntity<?> analyzeContent(@RequestHeader("X-USER-ID") UUID userId
@@ -51,5 +53,6 @@ public class PurchaseController {
 
     @GetMapping(value = "/order-credit/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter getOrderCreditStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
+        return sseOrderCreditService.OrderAnalyzeStatusSSE(orderId, userId);
     }
 }

@@ -17,7 +17,8 @@ import java.time.Instant;
 
 public class Jwt {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "jwt_id_generator")
+    @SequenceGenerator(name = "jwt_id_generator", sequenceName = "jwt_id_seq", allocationSize = 1)
     private Long id;
     @Column(nullable = false, name = "refresh_token" )
     private String refreshToken;

@@ -1,5 +1,7 @@
 package com.moj.userservice.Dto;
 
+import com.moj.userservice.Enums.ContentType;
+import com.moj.userservice.Enums.SumOfContent;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

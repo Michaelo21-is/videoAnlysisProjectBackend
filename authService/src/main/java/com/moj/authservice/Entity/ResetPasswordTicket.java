@@ -16,7 +16,8 @@ import java.time.Instant;
 @Table(name = "reset_password_ticket")
 public class ResetPasswordTicket {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "reset_password_ticket_id_generator")
+    @SequenceGenerator(name = "reset_password_ticket_id_generator", sequenceName = "reset_password_ticket_id_seq", allocationSize = 1)
     private Long id;
 
     @Column(nullable = false, name = "reset_token")

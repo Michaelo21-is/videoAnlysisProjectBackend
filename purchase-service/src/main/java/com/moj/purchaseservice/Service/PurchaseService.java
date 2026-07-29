@@ -134,10 +134,11 @@ public class PurchaseService {
         OrderCredit order = orderCreditRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
         order.setStatus(OrderStatus.PURCHASED);
+        orderCreditRepository.save(order);
         OrderCreditResponse response = OrderCreditResponse.builder()
                 .orderId(orderId)
-                .email(order.getUserId().toString())
-                .FullName(order.getUserId().toString())
+                .email(null)
+                .FullName(null)
                 .credit(order.getCredit())
                 .priceInUsd(order.getPriceInUsd())
                 .userId(order.getUserId())
@@ -152,7 +153,7 @@ public class PurchaseService {
         // response to the front for user message
 
     }
-    @RabbitListener(queues = RabbitMqConfig.Order_Credit_Status_Queue)
+    @RabbitListener(queues = RabbitMqConfig.ORDER_CREDIT_STATUS_QUEUE)
     public void orderCreditStatus(OrderCreditStatusDto orderCreditStatusDto) {
         if (orderCreditStatusDto.getOrderCreditStatus() == null) {
             return;

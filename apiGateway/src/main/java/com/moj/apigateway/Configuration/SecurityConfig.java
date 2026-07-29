@@ -16,6 +16,11 @@ import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttrib
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.security.web.server.csrf.CsrfWebFilter;
+import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 
 import java.util.List;
 
@@ -34,17 +39,36 @@ public class SecurityConfig {
             ServerHttpSecurity http,
             CorsConfigurationSource corsConfigurationSource
     ) {
+        ServerWebExchangeMatcher paddleWebhookMatcher =
+                ServerWebExchangeMatchers.pathMatchers(
+                        HttpMethod.POST,
+                        "/api/purchase/paddle/webhook"
+                );
+
+        /*
+         * Keep Spring's normal CSRF behavior for unsafe HTTP methods,
+         * but exclude Paddle's server-to-server webhook.
+         */
+        ServerWebExchangeMatcher csrfProtectionMatcher =
+                new AndServerWebExchangeMatcher(
+                        CsrfWebFilter.DEFAULT_CSRF_MATCHER,
+                        new NegatedServerWebExchangeMatcher(
+                                paddleWebhookMatcher
+                        )
+                );
+
         return http
+                .cors(cors ->
+                        cors.configurationSource(corsConfigurationSource)
+                )
 
-                // CORS must be handled by the security chain so it also covers local
-                // controllers (e.g. /api/csrf) — the gateway globalcors settings only
-                // apply to requests matched by gateway routes.
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
-
-                // CSRF protection for cookie-based authentication
                 .csrf(csrf -> csrf
+                        .requireCsrfProtectionMatcher(
+                                csrfProtectionMatcher
+                        )
                         .csrfTokenRepository(
-                                CookieServerCsrfTokenRepository.withHttpOnlyFalse()
+                                CookieServerCsrfTokenRepository
+                                        .withHttpOnlyFalse()
                         )
                         .csrfTokenRequestHandler(
                                 new ServerCsrfTokenRequestAttributeHandler()
@@ -67,35 +91,37 @@ public class SecurityConfig {
                         )
                 )
 
-
                 .authorizeExchange(exchange -> exchange
 
-                        // Allow browser preflight requests
                         .pathMatchers(HttpMethod.OPTIONS, "/**")
                         .permitAll()
 
-                        // Public endpoints
+                        /*
+                         * Paddle authenticates this request using
+                         * the Paddle-Signature header.
+                         */
+                        .pathMatchers(
+                                HttpMethod.POST,
+                                "/api/purchase/paddle/webhook"
+                        )
+                        .permitAll()
+
                         .pathMatchers(
                                 "/api/csrf",
                                 "/api/auth/sign-up",
                                 "/api/auth/sign-in",
                                 "/api/auth/forgot-my-password-request",
                                 "/api/auth/set-new-password",
-                                "/api/auth/password-reset/validate",
-                                "/api/auth/refresh-token",
-                                "/api/purchase/paddle/webhook"
-
+                                "/api/auth/password-reset/validate"
                         )
                         .permitAll()
 
-                        // Refresh token is read from the HttpOnly cookie
                         .pathMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/refresh-token"
                         )
                         .permitAll()
 
-                        // Endpoints that require a temporary token
                         .pathMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/verify-2fa",
@@ -104,10 +130,15 @@ public class SecurityConfig {
                         .hasAuthority(
                                 JwtAuthenticationFilter.TEMP_AUTHORITY
                         )
-                        .pathMatchers(HttpMethod.GET, "/api/auth/two-factor/status")
-                        .hasAuthority(JwtAuthenticationFilter.TEMP_AUTHORITY)
 
-                        // All other endpoints require a normal authenticated user
+                        .pathMatchers(
+                                HttpMethod.GET,
+                                "/api/auth/two-factor/status"
+                        )
+                        .hasAuthority(
+                                JwtAuthenticationFilter.TEMP_AUTHORITY
+                        )
+
                         .anyExchange()
                         .hasAnyRole("USER", "ADMIN")
                 )
@@ -119,7 +150,6 @@ public class SecurityConfig {
 
                 .build();
     }
-
     /**
      * Single CORS definition for everything the gateway serves — both locally
      * handled controllers and proxied routes. Allows the SPA origin to send
@@ -127,8 +157,7 @@ public class SecurityConfig {
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
-            @Value("${WEBSITE_URL}") String websiteUrl
-    ) {
+            @Value("${WEBSITE_URL}") String websiteUrl) {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(websiteUrl));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
