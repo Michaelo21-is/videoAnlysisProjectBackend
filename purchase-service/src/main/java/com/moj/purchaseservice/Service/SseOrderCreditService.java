@@ -1,10 +1,11 @@
 package com.moj.purchaseservice.Service;
 
-import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
-import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
+import com.moj.purchaseservice.Entity.OrderCredit;
+import com.moj.purchaseservice.Repository.OrderCreditRepository;
 import com.moj.purchaseservice.Response.OrderResponse;
 import com.moj.purchaseservice.Utils.CheckOrderStatus;
-import com.moj.purchaseservice.enums.OrderAnalyzeVideoStatus;
+import com.moj.purchaseservice.enums.OrderStatus;
+import com.moj.purchaseservice.enums.Status;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -16,17 +17,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class SseOrderAnalyzeContentService {
-
+public class SseOrderCreditService {
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>(); // holding all the order id connetion here
-    private final OrderAnalyzeContentsRepository orderAnalyzeContentsRepository;
-
-    public SseOrderAnalyzeContentService(OrderAnalyzeContentsRepository orderAnalyzeContentsRepository) {
-        this.orderAnalyzeContentsRepository = orderAnalyzeContentsRepository;
-
+    private final OrderCreditRepository orderCreditRepository;
+    public SseOrderCreditService(OrderCreditRepository orderCreditRepository) {
+        this.orderCreditRepository = orderCreditRepository;
     }
 
-    public SseEmitter orderAnalyzeStatusSse(Long orderId) {
+    public SseEmitter orderCreditStatusSse(Long orderId) {
         SseEmitter emitter =
                 new SseEmitter(10 * 60 * 1000L); ;// 10 min connection if time pass closing it
 
@@ -79,7 +77,7 @@ public class SseOrderAnalyzeContentService {
             emitter.send(
                     SseEmitter.event()
                             .id(orderId.toString())
-                            .name("analyze-content-status")
+                            .name("order-credit-status")
                             .data(response)
             );
 
@@ -97,8 +95,8 @@ public class SseOrderAnalyzeContentService {
 
 
     public SseEmitter OrderAnalyzeStatusSSE(Long orderId, UUID userId) {
-        OrderAnalyzeContents order =
-                orderAnalyzeContentsRepository
+        OrderCredit order =
+                orderCreditRepository
                         .findById(orderId)
                         .orElseThrow(() ->
                                 new ResponseStatusException(
@@ -114,18 +112,19 @@ public class SseOrderAnalyzeContentService {
             );
         }
 
-        SseEmitter emitter = orderAnalyzeStatusSse(orderId);
+        SseEmitter emitter = orderCreditStatusSse(orderId);
 
-        if (order.getStatus() == OrderAnalyzeVideoStatus.PURCHASED) {
-            // checking if already got the message from user service
-            OrderResponse response = CheckOrderStatus.createStatusResponse(order);
-            // sending it to the front
+        if (order.getStatus() == OrderStatus.PURCHASED){
+            OrderResponse response = OrderResponse.builder()
+                    .orderId(orderId)
+                    .status(Status.SUCCEED)
+                    .message("Order credit succeeded")
+                    .build();
+            // sending the response to the front and close the connection
             sendFinalStatus(orderId, response);
         }
 
         return emitter;
     }
-
-
 
 }

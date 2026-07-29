@@ -1,6 +1,8 @@
 package com.moj.purchaseservice.Controller;
 
+import com.moj.purchaseservice.Configuration.PaddleSignatureVerifier;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
+import com.moj.purchaseservice.Service.PaddleWebHookService;
 import com.moj.purchaseservice.Service.PurchaseService;
 import com.moj.purchaseservice.Service.SseOrderAnalyzeContentService;
 import com.moj.purchaseservice.enums.ContentType;
@@ -17,9 +19,12 @@ import java.util.UUID;
 public class PurchaseController {
     private final PurchaseService purchaseService;
     private final SseOrderAnalyzeContentService sseOrderAnalyzeContentService;
-    public PurchaseController(PurchaseService purchaseService, SseOrderAnalyzeContentService sseOrderAnalyzeContentService) {
+    private final PaddleWebHookService paddleWebHookService;
+    public PurchaseController(PurchaseService purchaseService
+    , SseOrderAnalyzeContentService sseOrderAnalyzeContentService, PaddleWebHookService paddleWebHookService) {
         this.purchaseService = purchaseService;
         this.sseOrderAnalyzeContentService = sseOrderAnalyzeContentService;
+        this.paddleWebHookService = paddleWebHookService;
     }
     @PostMapping("/analyze-content-request")
     public ResponseEntity<?> analyzeContent(@RequestHeader("X-USER-ID") UUID userId
@@ -36,19 +41,15 @@ public class PurchaseController {
         Long orderId = purchaseService.orderCredit(userId, orderCredit);
         return ResponseEntity.accepted().body(orderId);
     }
+
+    @PostMapping(value = "/paddle/webhook", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> paddleWebhook(@RequestBody String rawBody,
+            @RequestHeader("Paddle-Signature") String paddleSignature ) {
+        paddleWebHookService.handleWebHook(rawBody, paddleSignature);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping(value = "/order-credit/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter getOrderCreditStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
-    }
-    @PostMapping(
-            value = "/paddle/webhook",
-            consumes = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<Void> paddleWebhook(
-            @RequestBody String rawBody,
-            @RequestHeader("Paddle-Signature") String paddleSignature
-    ) {
-        paddleWebhookService.handleWebhook(rawBody, paddleSignature);
-
-        return ResponseEntity.ok().build();
     }
 }

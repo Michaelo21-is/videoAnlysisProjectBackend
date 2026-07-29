@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 @Builder
-public class OrderAnalyzeStatusResponse {
+public class OrderResponse {
     private Status status;
     private String message;
     private Long orderId;

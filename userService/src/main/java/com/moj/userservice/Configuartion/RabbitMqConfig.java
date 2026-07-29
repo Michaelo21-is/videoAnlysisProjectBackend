@@ -18,17 +18,13 @@ public class RabbitMqConfig {
     public static final String ORDER_ANALYZE_CONTENT_QUEUE = "order-analyze-content-queue";
 
     public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE = "order-analyze-content-status-queue";
-
     public static final String ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE = "order-analyze-content-status-exchange";
-
     public static final String ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY = "order-analyze-content-analyzeOrderStatus-routing-key";
 
     public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
 
     public static final String ORDER_CREDIT_STATUS_QUEUE = "order-credit-status-queue";
-
     public static final String ORDER_CREDIT_STATUS_EXCHANGE = "order-credit-status-exchange";
-
     public static final String ORDER_CREDIT_STATUS_ROUTING_KEY = "order-credit-analyzeOrderStatus-routing-key";
 
     @Bean

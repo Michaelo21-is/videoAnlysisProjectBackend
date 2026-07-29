@@ -37,6 +37,9 @@ public class SendToQueue {
                 .fullName(orderCreditDto.getFullName())
                 .orderCreditStatus(orderCreditStatus)
                 .build();
-
+        rabbitTemplate.convertAndSend(
+                RabbitMqConfig.ORDER_CREDIT_STATUS_EXCHANGE,
+                RabbitMqConfig.ORDER_CREDIT_STATUS_ROUTING_KEY,
+                response);
     }
 }

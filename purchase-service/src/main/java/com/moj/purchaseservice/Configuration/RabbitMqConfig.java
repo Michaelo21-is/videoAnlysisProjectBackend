@@ -25,6 +25,7 @@ public class RabbitMqConfig {
     public static final String ORDER_CREDIT_EXCHANGE = "order-credit-exchange";
     public static final String ORDER_CREDIT_ROUTING_KEY = "order.credit";
 
+    public static final String Order_Credit_Status_Queue = "order-credit-status-queue";
     @Bean
     public Queue orderAnalyzeContentStatusQueue() {
         return QueueBuilder

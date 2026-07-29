@@ -18,6 +18,10 @@ spring:
               uri: ${USER_SERVICE_URL}
               predicates:
                 - Path=/api/user/**
+            - id: purchase-service-route
+              uri: ${PURCHASE_SERVICE_URL}
+              predicates:
+                - Path=/api/purchase/**
 jwt:
   secret-key: ${JWT_SECRET_KEY}
 logging:

@@ -95,16 +95,16 @@ public class UserService {
     public void handleOrderCredit(OrderCreditDto orderCreditDto) {
         if (orderCreditDto.getCredit() == null || orderCreditDto.getEmail() == null || orderCreditDto.getFullName() == null
                 || orderCreditDto.getPriceInUsd() == null || orderCreditDto.getUserId() == null) {
-            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED);
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SERVER_FAILED);
         }
         Users user = userRepository.findById(orderCreditDto.getUserId())
                 .orElse(null);
         if (user == null) {
-            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED);
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SERVER_FAILED);
         }
         int updateRow = userRepository.addCredit(orderCreditDto.getUserId(), orderCreditDto.getCredit());
         if (updateRow == 0) {
-            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED);
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED_TO_ADD_CREDIT);
         }
         sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SUCCEED);
     }

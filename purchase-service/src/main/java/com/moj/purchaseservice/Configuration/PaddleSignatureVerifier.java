@@ -20,7 +20,7 @@ public class PaddleSignatureVerifier {
     private final String webhookSecret;
 
     public PaddleSignatureVerifier(
-            @Value("${paddle.webhook-secret}") String webhookSecret
+            @Value("${PADDLE_WEBHOOK_SECRET}") String webhookSecret
     ) {
         this.webhookSecret = webhookSecret;
     }

@@ -129,6 +129,7 @@ services:
       DATABASE_URL: ${PURCHASE_DATABASE_URL}
       DATABASE_USERNAME: ${DATABASE_USERNAME}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      PADDLE_WEBHOOK_SECRET: ${PADDLE_WEBHOOK_SECRET}
     depends_on:
       purchase-postgres:
         condition: service_healthy
@@ -142,6 +143,7 @@ services:
       # Internal Docker service URL for routing (application.yml -> AUTH_SERVICE_URL)
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
       USER_SERVICE_URL: ${USER_SERVICE_URL}
+      PURCHASE_SERVICE_URL: ${PURCHASE_SERVICE_URL}
       # Allowed CORS origin (application.yml globalcors -> WEBSITE_URL)
       WEBSITE_URL: ${WEBSITE_URL}
       # Same HS256 secret auth-service signs tokens with (application.yml -> jwt.secret-key)

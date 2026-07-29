@@ -82,7 +82,8 @@ public class SecurityConfig {
                                 "/api/auth/forgot-my-password-request",
                                 "/api/auth/set-new-password",
                                 "/api/auth/password-reset/validate",
-                                "/api/auth/refresh-token"
+                                "/api/auth/refresh-token",
+                                "/api/purchase/paddle/webhook"
 
                         )
                         .permitAll()

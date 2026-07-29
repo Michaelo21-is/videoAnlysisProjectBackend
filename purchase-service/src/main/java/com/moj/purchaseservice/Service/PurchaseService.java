@@ -2,13 +2,14 @@ package com.moj.purchaseservice.Service;
 
 import com.moj.purchaseservice.Configuration.RabbitMqConfig;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
+import com.moj.purchaseservice.Dto.OrderCreditStatusDto;
 import com.moj.purchaseservice.Dto.OrderStatusDto;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Entity.OrderCredit;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
 import com.moj.purchaseservice.Repository.OrderCreditRepository;
 import com.moj.purchaseservice.Response.OrderAnalyzeResponse;
-import com.moj.purchaseservice.Response.OrderAnalyzeStatusResponse;
+import com.moj.purchaseservice.Response.OrderResponse;
 import com.moj.purchaseservice.Response.OrderCreditResponse;
 import com.moj.purchaseservice.Response.ResolvePackageResponse;
 import com.moj.purchaseservice.Utils.ContentPricingCalculator;
@@ -28,14 +29,17 @@ public class PurchaseService {
     private final SseOrderAnalyzeContentService sseOrderAnalyzeContentService;
     private final OrderCreditRepository orderCreditRepository;
     private final PaddleResolvePackage paddleResolvePackage;
+    private final SseOrderCreditService sseOrderCreditService;
     public PurchaseService(OrderAnalyzeContentsRepository orderAnalyzeContentRepository
             , RabbitTemplate rabbitTemplate, SseOrderAnalyzeContentService sseOrderAnalyzeContentService,
-               OrderCreditRepository orderCreditRepository, PaddleResolvePackage paddleResolvePackage) {
+               OrderCreditRepository orderCreditRepository, PaddleResolvePackage paddleResolvePackage,
+           SseOrderCreditService sseOrderCreditService) {
         this.orderAnalyzeContentRepository = orderAnalyzeContentRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.sseOrderAnalyzeContentService = sseOrderAnalyzeContentService;
         this.orderCreditRepository = orderCreditRepository;
         this.paddleResolvePackage = paddleResolvePackage;
+        this.sseOrderCreditService = sseOrderCreditService;
     }
     ///
     /// order analyze content request
@@ -68,14 +72,14 @@ public class PurchaseService {
 
         OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(orderStatusDto.getOrderId())
                 .orElseThrow(() -> new RuntimeException("Order not found"));
-        OrderAnalyzeStatusResponse response;
+        OrderResponse response;
 
         switch (orderStatusDto.getStatus()) {
             case SUCCEED -> {
                 order.setStatus(OrderAnalyzeVideoStatus.PURCHASED);
                 order.setPurchasedAt(Instant.now());
                 orderAnalyzeContentRepository.save(order);
-                response = OrderAnalyzeStatusResponse.builder()
+                response = OrderResponse.builder()
                         .status(Status.SUCCEED)
                         .orderId(orderStatusDto.getOrderId())
                         .message("Order analyze content succeeded")
@@ -85,7 +89,7 @@ public class PurchaseService {
             case PAYMENT_FAILED -> {
                 order.setStatus(OrderAnalyzeVideoStatus.PAYMENT_FAILED);
                 orderAnalyzeContentRepository.save(order);
-                response = OrderAnalyzeStatusResponse.builder()
+                response = OrderResponse.builder()
                         .orderId(orderStatusDto.getOrderId())
                         .status(Status.PAYMENT_FAILED)
                         .message("Not enough credits in your account")
@@ -94,7 +98,7 @@ public class PurchaseService {
             case SERVER_FAILED ->{
                 order.setStatus(OrderAnalyzeVideoStatus.SERVER_FAILED);
                 orderAnalyzeContentRepository.save(order);
-                response = OrderAnalyzeStatusResponse.builder()
+                response = OrderResponse.builder()
                         .orderId(orderStatusDto.getOrderId())
                         .status(Status.PAYMENT_FAILED)
                         .message("Something went wrong with our server, please try again later")
@@ -126,12 +130,9 @@ public class PurchaseService {
 
         return order.getId();
     }
-    public void orderCreditPurchasedSuccessfully(Long orderId, UUID userId) {
+    public void orderCreditPurchasedSuccessfully(Long orderId) {
         OrderCredit order = orderCreditRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
-        if (!order.getUserId().equals(userId)) {
-            throw new RuntimeException("You cannot access this order");
-        }
         order.setStatus(OrderStatus.PURCHASED);
         OrderCreditResponse response = OrderCreditResponse.builder()
                 .orderId(orderId)
@@ -143,7 +144,54 @@ public class PurchaseService {
                 .build();
         rabbitTemplate.convertAndSend(RabbitMqConfig.ORDER_CREDIT_EXCHANGE, RabbitMqConfig.ORDER_CREDIT_ROUTING_KEY, response);
     }
+    public void orderCreditPurchasedFailed(Long orderId) {
+        OrderCredit order = orderCreditRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        order.setStatus(OrderStatus.PAYMENT_FAILED);
+        orderCreditRepository.save(order);
+        // response to the front for user message
 
+    }
+    @RabbitListener(queues = RabbitMqConfig.Order_Credit_Status_Queue)
+    public void orderCreditStatus(OrderCreditStatusDto orderCreditStatusDto) {
+        if (orderCreditStatusDto.getOrderCreditStatus() == null) {
+            return;
+        }
+        OrderCredit orderCredit = orderCreditRepository.findById(orderCreditStatusDto.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        switch (orderCreditStatusDto.getOrderCreditStatus()) {
+            case SUCCEED -> {
+                orderCredit.setStatus(OrderStatus.PURCHASED);
+                orderCreditRepository.save(orderCredit);
+                OrderResponse response = OrderResponse.builder()
+                        .orderId(orderCreditStatusDto.getOrderId())
+                        .status(Status.SUCCEED)
+                        .message("Order credit succeeded")
+                        .build();
+                sseOrderCreditService.sendFinalStatus(orderCreditStatusDto.getOrderId(), response);
+            }
+            case PAYMENT_FAILED -> {
+                orderCredit.setStatus(OrderStatus.PAYMENT_FAILED);
+                orderCreditRepository.save(orderCredit);
+                OrderResponse response = OrderResponse.builder()
+                        .orderId(orderCreditStatusDto.getOrderId())
+                        .status(Status.PAYMENT_FAILED)
+                        .message("Not enough credits in your account")
+                        .build();
+                sseOrderCreditService.sendFinalStatus(orderCreditStatusDto.getOrderId(), response);
+            }
+            default -> {
+                orderCredit.setStatus(OrderStatus.SERVER_FAILED);
+                orderCreditRepository.save(orderCredit);
+                OrderResponse response = OrderResponse.builder()
+                        .orderId(orderCreditStatusDto.getOrderId())
+                        .status(Status.SERVER_FAILED)
+                        .message("Something went wrong with our server, please try again later")
+                        .build();
+                sseOrderCreditService.sendFinalStatus(orderCreditStatusDto.getOrderId(), response);
+            }
+        }
+    }
     ///
     /// order credit
     ///
