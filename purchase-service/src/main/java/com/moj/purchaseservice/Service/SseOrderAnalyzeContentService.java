@@ -90,9 +90,6 @@ public class SseOrderAnalyzeContentService {
         }
     }
 
-    public boolean isConnected(Long orderId) {
-        return emitters.containsKey(orderId);
-    }
 
 
 

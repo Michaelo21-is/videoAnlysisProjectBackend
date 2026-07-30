@@ -79,7 +79,7 @@ public class NotificationService {
         CreateEmailOptions params = CreateEmailOptions.builder()
                 .from("Acme <onboarding@resend.dev>")
                 .to(orderCreditStatusDto.getEmail())
-                .subject("reset password")
+                .subject("order credit complete successfully")
                 .html("<h1>" + message + "</h1>")
                 .build();
         try {
