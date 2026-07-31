@@ -14,7 +14,7 @@ discovery.relabel "containers" {
       "__meta_docker_container_label_com_docker_compose_service",
     ]
 
-    regex = "auth-service|notification-service|api-gateway|user-service|purchase-service"
+    regex = "auth-service|notification-service|api-gateway|user-service|purchase-service|llm-service"
     action = "keep"
   }
 

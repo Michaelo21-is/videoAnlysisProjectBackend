@@ -149,6 +149,16 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  llm-service:
+    build: ./LLMService
+    container_name: llm-service
+    ports:
+      - "8000:8000"
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: ${MONGODB_DATABASE}
+
+
   api-gateway:
     build: ./apiGateway
     container_name: api-gateway
@@ -159,6 +169,7 @@ services:
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
       USER_SERVICE_URL: ${USER_SERVICE_URL}
       PURCHASE_SERVICE_URL: ${PURCHASE_SERVICE_URL}
+      LLM_SERVICE_URL: ${LLM_SERVICE_URL}
       # Allowed CORS origin (application.yml globalcors -> WEBSITE_URL)
       WEBSITE_URL: ${WEBSITE_URL}
       # Same HS256 secret auth-service signs tokens with (application.yml -> jwt.secret-key)

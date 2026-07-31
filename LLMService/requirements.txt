@@ -1,4 +1,5 @@
 fastapi
 uvicorn[standard]
-pymongo[srv]
+pydantic
+pymongo
 python-dotenv
