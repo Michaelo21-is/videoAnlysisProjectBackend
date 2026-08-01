@@ -26,7 +26,6 @@ class DiagramUpdate(BaseModel):
 class DiagramResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    id: str = Field(alias="_id")
     name: str
     prompt: str = ""
 
@@ -46,3 +45,7 @@ class DiagramNameResponse(BaseModel):
 
 class DiagramNameListResponse(BaseModel):
     diagrams: list[DiagramNameResponse]
+class UserDiagramsResponse(BaseModel):
+    diagrams: list[DiagramNameResponse]
+    total_pages: int | None = Field(default=None, alias="totalPages")
+    sum_of_diagram: int | None = Field(default=None, alias="sumOfDiagram")

@@ -1,11 +1,12 @@
 import logging
 from datetime import datetime
 from uuid import UUID
+from fastapi import HTTPException, status
 
 from app.Config.DatabaseConfig import get_database
 from app.Model.DiagramModel import DiagramDocument
-from app.Schemea.DiagramSchemea import DiagramCreate, DiagramNameListResponse, DiagramNameResponse
-
+from app.Schemea.DiagramSchemea import (DiagramCreate, DiagramNameListResponse
+, DiagramNameResponse, UserDiagramsResponse, DiagramResponse)
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,88 @@ class DiagramService:
         except Exception:
             logger.exception(
                 "Error getting user diagrams: user_id=%s",
+                user_id,
+            )
+            raise
+    def get_user_diagrams(self, user_id: UUID, page: int = 1, limit: int = 9, firstTimeRequest: bool = False) -> UserDiagramsResponse:
+        try:
+            skip = (page - 1) * limit
+            totalPages: int | None = None
+            total_diagrams: int | None = None
+            if page == 1 and firstTimeRequest == True:
+                total_diagrams = self.diagram_collection.count_documents({"userId": str(user_id)})
+                totalPages = (total_diagrams + limit - 1) // limit  # Calculates the total number of pages, rounding up.
+            documents = list(
+                self.diagram_collection
+                .find(
+                    {"userId": str(user_id)},
+                    {
+                        "name": 1,
+                        "createdAt": 1,
+                    },
+                )
+                .sort("createdAt", -1)
+                .skip(skip)
+                .limit(limit)
+            )
+            diagrams = [
+                DiagramNameResponse(
+                    _id=str(document["_id"]),
+                    name=document["name"],
+                    createdAt=document["createdAt"],
+                )
+                for document in documents
+            ]
+
+            return UserDiagramsResponse(
+                diagrams=diagrams,
+                totalPages=totalPages,
+                sumOfDiagram= total_diagrams,
+            )
+
+        except Exception:
+            logger.exception(
+                "Error getting user diagrams: user_id=%s",
+                user_id,
+            )
+            raise
+    def get_diagram(self, diagram_id: str, user_id: UUID) -> DiagramResponse:
+        try:
+
+
+
+            document = self.diagram_collection.find_one({
+                "_id": diagram_id,
+            })
+
+            if document is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Diagram not found",
+                )
+
+            if document["userId"] != str(user_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to access this diagram",
+                )
+
+            return DiagramResponse(
+                name=document["name"],
+                prompt=document["prompt"],
+                nodes=document["nodes"],
+                arrows=document["arrows"],
+                createdAt=document["createdAt"],
+                updatedAt=document["updatedAt"],
+            )
+
+        except HTTPException:
+            raise
+
+        except Exception:
+            logger.exception(
+                "Error getting diagram: diagram_id=%s, user_id=%s",
+                diagram_id,
                 user_id,
             )
             raise
