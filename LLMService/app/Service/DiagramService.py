@@ -20,7 +20,7 @@ class DiagramService:
             logger.exception("Error initializing diagram database collection")
             raise
 
-    def create_diagram(  self,     diagram: DiagramCreate,     user_id: UUID  ) -> None:
+    def create_diagram( self, diagram: DiagramCreate, user_id: UUID  ) -> None:
         try:
             now = datetime.now()
 
@@ -57,14 +57,8 @@ class DiagramService:
                 diagram.name,
             )
             raise
-    def get_user_diagrams(
-        self,
-        user_id: UUID,
-        page: int,
-        limit: int = 10,
-    ) -> DiagramNameListResponse:
+    def get_recent_user_diagrams(self, user_id: UUID, limit: int = 5,) -> DiagramNameListResponse:
         try:
-            skip = (page - 1) * limit
 
             documents = list(
                 self.diagram_collection
@@ -76,12 +70,9 @@ class DiagramService:
                     },
                 )
                 .sort("createdAt", -1)
-                .skip(skip)
-                .limit(limit + 1)
+                .limit(limit)
             )
 
-            has_next = len(documents) > limit
-            documents = documents[:limit]
 
             diagrams = [
                 DiagramNameResponse(
@@ -94,14 +85,11 @@ class DiagramService:
 
             return DiagramNameListResponse(
                 diagrams=diagrams,
-                page=page,
-                hasNext=has_next,
             )
 
         except Exception:
             logger.exception(
-                "Error getting user diagrams: user_id=%s, page=%s",
+                "Error getting user diagrams: user_id=%s",
                 user_id,
-                page,
             )
             raise

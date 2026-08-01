@@ -46,6 +46,3 @@ class DiagramNameResponse(BaseModel):
 
 class DiagramNameListResponse(BaseModel):
     diagrams: list[DiagramNameResponse]
-
-    page: int
-    has_next: bool = Field(alias="hasNext")

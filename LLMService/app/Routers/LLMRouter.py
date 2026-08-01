@@ -26,14 +26,8 @@ def create_diagram(
     )
 
 
-@router.get(
-    "/get-user-diagrams",
-    status_code=status.HTTP_200_OK,
-)
-def get_user_diagrams(   user_id: Annotated[UUID, Header(alias="X-USER-ID")],
-                         page: Annotated[int, Query(ge=1)] = 1,
-    ) -> DiagramNameListResponse:
+@router.get("/user-diagrams/recent",status_code=status.HTTP_200_OK,)
+def get_user_diagrams(   user_id: Annotated[UUID, Header(alias="X-USER-ID")] ) -> DiagramNameListResponse:
     return diagram_service.get_user_diagrams(
         user_id=user_id,
-        page=page,
     )
