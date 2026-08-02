@@ -46,3 +46,20 @@ def get_diagram(diagram_id: str, user_id: Annotated[UUID, Header(alias="X-USER-I
         diagram_id=diagram_id,
         user_id=user_id,
     )
+@router.get( "/user-diagrams/get-diagrams", status_code=status.HTTP_200_OK,)
+def get_user_diagrams( user_id: Annotated[UUID, Header(alias="X-USER-ID")], page: Annotated[int, Query(ge=1)] = 1,
+   first_time_request: Annotated[ bool, Query(alias="firstTimeRequest"),] = False,) -> UserDiagramsResponse:
+    return diagram_service.get_user_diagrams(
+        user_id=user_id,
+        page=page,
+        firstTimeRequest=first_time_request,
+    )
+@router.get("/user-diagrams/get-diagram-by-query")
+def get_diagram_by_query(user_id: Annotated[UUID, Header(alias="X-USER-ID")],
+    query: Annotated[str, Query(min_length=1)],page: Annotated[int, Query(ge=1)] = 1,
+) -> UserDiagramsResponse:
+    return diagram_service.get_diagram_by_query(
+        query=query,
+        user_id=user_id,
+        page=page,
+    )

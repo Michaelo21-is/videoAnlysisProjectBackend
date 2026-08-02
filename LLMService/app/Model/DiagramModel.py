@@ -48,6 +48,7 @@ class DiagramDocument(BaseModel):
 
     name: str
     prompt: str = ""
+    private: bool = False
 
     nodes: list[DiagramNode] = Field(default_factory=list)
     arrows: list[DiagramArrow] = Field(default_factory=list)

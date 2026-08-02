@@ -29,6 +29,7 @@ class DiagramService:
                 userId=str(user_id),
                 name=diagram.name,
                 prompt=diagram.prompt,
+                private=diagram.private,
                 nodes=[
                     node.model_dump(by_alias=True)
                     for node in diagram.nodes
@@ -136,6 +137,70 @@ class DiagramService:
                 user_id,
             )
             raise
+
+    def get_diagram_by_query(
+            self,
+            query: str,
+            user_id: UUID,
+            limit: int = 9,
+            page: int = 1,
+    ) -> UserDiagramsResponse:
+        try:
+            skip = (page - 1) * limit
+            cleaned_query = query.strip()
+
+            search_filter = {
+                "userId": str(user_id),
+                "name": {
+                    "$regex": f"^{cleaned_query}",
+                    "$options": "i",
+                },
+            }
+
+            total_diagrams = self.diagram_collection.count_documents(
+                search_filter
+            )
+
+            total_pages = (
+                                  total_diagrams + limit - 1
+                          ) // limit
+
+            documents = list(
+                self.diagram_collection
+                .find(
+                    search_filter,
+                    {
+                        "name": 1,
+                        "createdAt": 1,
+                    },
+                )
+                .sort("createdAt", -1)
+                .skip(skip)
+                .limit(limit)
+            )
+
+            diagrams = [
+                DiagramNameResponse(
+                    _id=str(document["_id"]),
+                    name=document["name"],
+                    createdAt=document["createdAt"],
+                )
+                for document in documents
+            ]
+
+            return UserDiagramsResponse(
+                diagrams=diagrams,
+                totalPages=total_pages,
+                sumOfDiagram=total_diagrams,
+            )
+
+        except Exception:
+            logger.exception(
+                "Error searching user diagrams: user_id=%s, query=%s",
+                user_id,
+                query,
+            )
+            raise
     def get_diagram(self, diagram_id: str, user_id: UUID) -> DiagramResponse:
         try:
 
@@ -150,12 +215,12 @@ class DiagramService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Diagram not found",
                 )
-
-            if document["userId"] != str(user_id):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You are not authorized to access this diagram",
-                )
+            if document["private"]:
+                if document["userId"] != str(user_id):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="You are not authorized to access this diagram",
+                    )
 
             return DiagramResponse(
                 name=document["name"],
