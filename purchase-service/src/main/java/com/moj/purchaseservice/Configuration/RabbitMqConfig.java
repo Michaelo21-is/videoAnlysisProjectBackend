@@ -70,7 +70,15 @@ public class RabbitMqConfig {
 
     public static final String ORDER_CREDIT_STATUS_ROUTING_KEY =
             "order-credit-analyzeOrderStatus-routing-key";
-
+    /*
+    * order analyze video
+     */
+    public static final String ORDER_ANALYZE_VIDEO_EXCHANGE =
+            "order-analyze-video-exchange";
+    public static final String ORDER_ANALYZE_VIDEO_QUEUE =
+            "order-analyze-video-queue";
+    public static final String ORDER_ANALYZE_VIDEO_ROUTING_KEY =
+            "order.analyze.video";
     /*
      * Analyze-content request configuration.
      */
@@ -183,7 +191,28 @@ public class RabbitMqConfig {
                 .to(exchange)
                 .with(ORDER_CREDIT_STATUS_ROUTING_KEY);
     }
-
+    /*
+        order analysis request
+     */
+    @Bean
+    public DirectExchange orderAnalyzeVideoExchange() {
+        return new DirectExchange(
+                ORDER_ANALYZE_VIDEO_EXCHANGE
+        );
+    }
+    @Bean
+    public Queue orderAnalyzeVideoQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_VIDEO_QUEUE)
+                .build();
+    }
+    @Bean
+    public Binding orderAnalyzeVideoBinding(@Qualifier("orderAnalyzeVideoQueue") Queue queue, @Qualifier("orderAnalyzeVideoExchange") DirectExchange exchange){
+        return BindingBuilder
+                .bind(queue)
+                .to(exchange)
+                .with(ORDER_ANALYZE_VIDEO_ROUTING_KEY);
+    }
     @Bean
     public MessageConverter messageConverter() {
         return new JacksonJsonMessageConverter();

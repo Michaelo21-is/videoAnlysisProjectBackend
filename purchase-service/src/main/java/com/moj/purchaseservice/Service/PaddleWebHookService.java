@@ -1,5 +1,6 @@
 package com.moj.purchaseservice.Service;
 
+import lombok.extern.slf4j.Slf4j;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -7,6 +8,7 @@ import com.moj.purchaseservice.Configuration.PaddleSignatureVerifier;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class PaddleWebHookService {
 
     private final ObjectMapper objectMapper;

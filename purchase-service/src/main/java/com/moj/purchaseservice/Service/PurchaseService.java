@@ -5,16 +5,17 @@ import com.moj.purchaseservice.Dto.OrderCreditDto;
 import com.moj.purchaseservice.Dto.OrderCreditStatusDto;
 import com.moj.purchaseservice.Dto.OrderStatusDto;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
+import com.moj.purchaseservice.Entity.OrderAnalyzeVideo;
 import com.moj.purchaseservice.Entity.OrderCredit;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
+import com.moj.purchaseservice.Repository.OrderAnalyzeVideoRepository;
 import com.moj.purchaseservice.Repository.OrderCreditRepository;
-import com.moj.purchaseservice.Response.OrderAnalyzeResponse;
-import com.moj.purchaseservice.Response.OrderResponse;
-import com.moj.purchaseservice.Response.OrderCreditResponse;
-import com.moj.purchaseservice.Response.ResolvePackageResponse;
+import com.moj.purchaseservice.Response.*;
 import com.moj.purchaseservice.Utils.ContentPricingCalculator;
 import com.moj.purchaseservice.Utils.PaddleResolvePackage;
 import com.moj.purchaseservice.enums.*;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class PurchaseService {
     private final RabbitTemplate rabbitTemplate;
     private final OrderAnalyzeContentsRepository orderAnalyzeContentRepository;
@@ -30,16 +32,21 @@ public class PurchaseService {
     private final OrderCreditRepository orderCreditRepository;
     private final PaddleResolvePackage paddleResolvePackage;
     private final SseOrderCreditService sseOrderCreditService;
+    private final OrderAnalyzeVideoRepository orderAnalyzeVideoRepository;
+    private final Long costOfOrderVideoAnalyze;
     public PurchaseService(OrderAnalyzeContentsRepository orderAnalyzeContentRepository
             , RabbitTemplate rabbitTemplate, SseOrderAnalyzeContentService sseOrderAnalyzeContentService,
                OrderCreditRepository orderCreditRepository, PaddleResolvePackage paddleResolvePackage,
-           SseOrderCreditService sseOrderCreditService) {
+           SseOrderCreditService sseOrderCreditService, @Value("${video-analysis.credit-cost}") Long costOfOrderVideoAnalyze
+    , OrderAnalyzeVideoRepository orderAnalyzeVideoRepository) {
         this.orderAnalyzeContentRepository = orderAnalyzeContentRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.sseOrderAnalyzeContentService = sseOrderAnalyzeContentService;
         this.orderCreditRepository = orderCreditRepository;
         this.paddleResolvePackage = paddleResolvePackage;
         this.sseOrderCreditService = sseOrderCreditService;
+        this.costOfOrderVideoAnalyze = costOfOrderVideoAnalyze;
+        this.orderAnalyzeVideoRepository = orderAnalyzeVideoRepository;
     }
     ///
     /// order analyze content request
@@ -119,6 +126,11 @@ public class PurchaseService {
             throw new RuntimeException("problem with security configurations in api gateway");
         }
         ResolvePackageResponse response = paddleResolvePackage.resolvePriceId(orderCredit.getProductId()) ;
+        log.info(
+                "Resolved package: credit={}, priceInUsd={}",
+                response.getCredit(),
+                response.getPriceInUsd()
+        );
         OrderCredit order = OrderCredit.builder()
                 .credit(response.getCredit())
                 .priceInUsd(response.getPriceInUsd())
@@ -131,10 +143,12 @@ public class PurchaseService {
         return order.getId();
     }
     public void orderCreditPurchasedSuccessfully(Long orderId) {
+        log.info("order credit purchased successfully");
         OrderCredit order = orderCreditRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
         order.setStatus(OrderStatus.PURCHASED);
         orderCreditRepository.save(order);
+        log.info("order credit status updated to purchased");
         OrderCreditResponse response = OrderCreditResponse.builder()
                 .orderId(orderId)
                 .email(null)
@@ -143,6 +157,7 @@ public class PurchaseService {
                 .priceInUsd(order.getPriceInUsd())
                 .userId(order.getUserId())
                 .build();
+
         rabbitTemplate.convertAndSend(RabbitMqConfig.ORDER_CREDIT_EXCHANGE, RabbitMqConfig.ORDER_CREDIT_ROUTING_KEY, response);
     }
     public void orderCreditPurchasedFailed(Long orderId) {
@@ -196,5 +211,26 @@ public class PurchaseService {
     ///
     /// order credit
     ///
+    /*
+        order analyze video
+     */
+
+    public Long orderAnalyzeVideo(UUID userId){
+        OrderAnalyzeVideo orderAnalyzeVideo = OrderAnalyzeVideo.builder()
+                .userId(userId)
+                .status(OrderStatus.PENDING)
+                .build();
+        orderAnalyzeVideoRepository.save(orderAnalyzeVideo);
+        OrderAnalyzeVideoResponse response = OrderAnalyzeVideoResponse.builder()
+                .orderId(orderAnalyzeVideo.getId())
+                .userId(userId)
+                .creditCost(costOfOrderVideoAnalyze)
+                .build();
+        rabbitTemplate.convertAndSend(RabbitMqConfig.ORDER_ANALYZE_VIDEO_EXCHANGE, RabbitMqConfig.ORDER_ANALYZE_VIDEO_ROUTING_KEY, response);
+        return orderAnalyzeVideo.getId();
+    }
+    /*
+        order analyze video
+     */
 
 }

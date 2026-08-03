@@ -96,9 +96,7 @@ public class UserService {
     @RabbitListener(queues = RabbitMqConfig.ORDER_CREDIT_QUEUE)
     @Transactional
     public void handleOrderCredit(OrderCreditDto orderCreditDto) {
-        if (orderCreditDto.getCredit() == null || orderCreditDto.getFullName() == null
-                || orderCreditDto.getPriceInUsd() == null || orderCreditDto.getUserId() == null) {
-            log.info("Order credit is null");
+        if (orderCreditDto.getCredit() == null || orderCreditDto.getPriceInUsd() == null || orderCreditDto.getUserId() == null) {
             sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SERVER_FAILED);
             return;
         }
@@ -117,6 +115,7 @@ public class UserService {
         }
         orderCreditDto.setEmail(user.getEmail());
         orderCreditDto.setFullName(user.getFullName());
+        log.info("Credit added");
         sendToQueue.sendOrderCreditStatus(orderCreditDto, OrderCreditStatus.SUCCEED);
     }
 
