@@ -34,11 +34,12 @@ public class PurchaseService {
     private final SseOrderCreditService sseOrderCreditService;
     private final OrderAnalyzeVideoRepository orderAnalyzeVideoRepository;
     private final Long costOfOrderVideoAnalyze;
+    private final SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService;
     public PurchaseService(OrderAnalyzeContentsRepository orderAnalyzeContentRepository
             , RabbitTemplate rabbitTemplate, SseOrderAnalyzeContentService sseOrderAnalyzeContentService,
-               OrderCreditRepository orderCreditRepository, PaddleResolvePackage paddleResolvePackage,
+           OrderCreditRepository orderCreditRepository, PaddleResolvePackage paddleResolvePackage,
            SseOrderCreditService sseOrderCreditService, @Value("${video-analysis.credit-cost}") Long costOfOrderVideoAnalyze
-    , OrderAnalyzeVideoRepository orderAnalyzeVideoRepository) {
+    , OrderAnalyzeVideoRepository orderAnalyzeVideoRepository, SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService) {
         this.orderAnalyzeContentRepository = orderAnalyzeContentRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.sseOrderAnalyzeContentService = sseOrderAnalyzeContentService;
@@ -47,6 +48,7 @@ public class PurchaseService {
         this.sseOrderCreditService = sseOrderCreditService;
         this.costOfOrderVideoAnalyze = costOfOrderVideoAnalyze;
         this.orderAnalyzeVideoRepository = orderAnalyzeVideoRepository;
+        this.sseOrderAnalyzeVideoService = sseOrderAnalyzeVideoService;
     }
     ///
     /// order analyze content request
@@ -228,6 +230,34 @@ public class PurchaseService {
                 .build();
         rabbitTemplate.convertAndSend(RabbitMqConfig.ORDER_ANALYZE_VIDEO_EXCHANGE, RabbitMqConfig.ORDER_ANALYZE_VIDEO_ROUTING_KEY, response);
         return orderAnalyzeVideo.getId();
+    }
+    @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
+    public void orderAnalyzeVideoStatus(OrderStatusDto orderStatusDto) {
+        if (orderStatusDto.getStatus() == null) {
+            return;
+        }
+        OrderAnalyzeVideo order = orderAnalyzeVideoRepository.findById(orderStatusDto.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        switch (orderStatusDto.getStatus()) {
+            case SUCCEED -> {
+                order.setStatus(OrderStatus.PURCHASED);
+                orderAnalyzeVideoRepository.save(order);
+                sseOrderAnalyzeVideoService.sendFinalStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
+                        .orderId(orderStatusDto.getOrderId())
+                        .status(Status.SUCCEED)
+                        .message("Order analyze video succeeded")
+                        .build());
+            }
+            case PAYMENT_FAILED -> {
+
+            }
+            case SERVER_FAILED -> {
+
+            }
+            default -> {
+
+            }
+        }
     }
     /*
         order analyze video

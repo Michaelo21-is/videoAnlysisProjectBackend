@@ -5,6 +5,7 @@ import com.moj.userservice.Dto.OrderCreditDto;
 import com.moj.userservice.Enums.AnalyzeOrderStatus;
 import com.moj.userservice.Enums.OrderCreditStatus;
 import com.moj.userservice.Response.OrderCreditResponse;
+import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
 import com.moj.userservice.Response.PurchaseWithCreditResponse;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
@@ -41,5 +42,12 @@ public class SendToQueue {
                 RabbitMqConfig.ORDER_CREDIT_STATUS_EXCHANGE,
                 RabbitMqConfig.ORDER_CREDIT_STATUS_ROUTING_KEY,
                 response);
+    }
+    public void sendOrderAnalyzeStatus(OrderVideoAnalysisStatusResponse response){
+        rabbitTemplate.convertAndSend(
+                RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_EXCHANGE,
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY,
+                response
+        );
     }
 }

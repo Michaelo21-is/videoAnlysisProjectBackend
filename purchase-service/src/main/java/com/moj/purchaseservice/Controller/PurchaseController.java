@@ -1,10 +1,7 @@
 package com.moj.purchaseservice.Controller;
 
 import com.moj.purchaseservice.Dto.OrderCreditDto;
-import com.moj.purchaseservice.Service.PaddleWebHookService;
-import com.moj.purchaseservice.Service.PurchaseService;
-import com.moj.purchaseservice.Service.SseOrderAnalyzeContentService;
-import com.moj.purchaseservice.Service.SseOrderCreditService;
+import com.moj.purchaseservice.Service.*;
 import com.moj.purchaseservice.enums.ContentType;
 import com.moj.purchaseservice.enums.SumOfContent;
 import org.springframework.http.MediaType;
@@ -20,13 +17,16 @@ public class PurchaseController {
     private final PurchaseService purchaseService;
     private final SseOrderAnalyzeContentService sseOrderAnalyzeContentService;
     private final SseOrderCreditService sseOrderCreditService;
+    private final SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService;
     private final PaddleWebHookService paddleWebHookService;
     public PurchaseController(PurchaseService purchaseService, SseOrderAnalyzeContentService sseOrderAnalyzeContentService
-    , PaddleWebHookService paddleWebHookService, SseOrderCreditService sseOrderCreditService) {
+    , PaddleWebHookService paddleWebHookService, SseOrderCreditService sseOrderCreditService ,
+      SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService) {
         this.purchaseService = purchaseService;
         this.sseOrderAnalyzeContentService = sseOrderAnalyzeContentService;
         this.paddleWebHookService = paddleWebHookService;
         this.sseOrderCreditService = sseOrderCreditService;
+        this.sseOrderAnalyzeVideoService = sseOrderAnalyzeVideoService;
     }
 
     @PostMapping("/order-credit-request")
@@ -62,4 +62,9 @@ public class PurchaseController {
         Long orderId = purchaseService.orderAnalyzeVideo(userId);
         return ResponseEntity.accepted().body(orderId);
     }
+    @GetMapping(value = "/order-analyze-video/status/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter getAnalyzeVideoStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
+        return sseOrderAnalyzeVideoService.OrderAnalyzeStatusSSE(orderId, userId);
+    }
+
 }

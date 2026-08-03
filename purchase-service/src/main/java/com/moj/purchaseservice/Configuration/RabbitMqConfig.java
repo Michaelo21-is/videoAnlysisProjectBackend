@@ -73,12 +73,26 @@ public class RabbitMqConfig {
     /*
     * order analyze video
      */
-    public static final String ORDER_ANALYZE_VIDEO_EXCHANGE =
-            "order-analyze-video-exchange";
-    public static final String ORDER_ANALYZE_VIDEO_QUEUE =
-            "order-analyze-video-queue";
-    public static final String ORDER_ANALYZE_VIDEO_ROUTING_KEY =
-            "order.analyze.video";
+    public static final String ORDER_ANALYZE_VIDEO_EXCHANGE = "order-analyze-video-exchange";
+    public static final String ORDER_ANALYZE_VIDEO_QUEUE = "order-analyze-video-queue";
+    public static final String ORDER_ANALYZE_VIDEO_ROUTING_KEY = "order.analyze.video";
+    /*
+     * order analyze video
+     */
+    /*
+        order analyze video status
+     */
+    public static final String ORDER_ANALYZE_VIDEO_STATUS_QUEUE = "order-analyze-video-status-queue";
+    /*
+        order analyze status request configuration
+     */
+    @Bean
+    public Queue orderAnalyzeVideoStatusQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
+                .build();
+    }
+
     /*
      * Analyze-content request configuration.
      */

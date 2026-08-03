@@ -2,11 +2,13 @@ package com.moj.userservice.Service;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
 import com.moj.userservice.Dto.OrderAnalyzeDto;
+import com.moj.userservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.userservice.Dto.OrderCreditDto;
 import com.moj.userservice.Entity.Users;
 import com.moj.userservice.Enums.AnalyzeOrderStatus;
 import com.moj.userservice.Enums.OrderCreditStatus;
 import com.moj.userservice.Repository.UserRepository;
+import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
 import com.moj.userservice.Response.UserDetailsResponse;
 import com.moj.userservice.Utils.SendToQueue;
 import lombok.extern.slf4j.Slf4j;
@@ -83,7 +85,13 @@ public class UserService {
         }
 
         long updatedCreditSum = user.getCreditSum() - orderAnalyzeDto.getCreditCost();
-
+        if (updatedCreditSum < 0) {
+            log.info("Credit sum is less than 0");
+            sendToQueue.sendOrderStatus(
+                    orderAnalyzeDto.getOrderId(),
+                    AnalyzeOrderStatus.PAYMENT_FAILED
+            );
+        }
         user.setCreditSum(updatedCreditSum);
         userRepository.save(user);
 
@@ -118,7 +126,50 @@ public class UserService {
         log.info("Credit added");
         sendToQueue.sendOrderCreditStatus(orderCreditDto, OrderCreditStatus.SUCCEED);
     }
-
+    @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_QUEUE)
+    public void handleOrderAnalyzeVideo(OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
+        if (orderAnalyzeVideoDto.getUserId() == null || orderAnalyzeVideoDto.getCreditCost() == null || orderAnalyzeVideoDto.getOrderId() == null) {
+            log.info("some of the parameters are null: {}", orderAnalyzeVideoDto);
+            OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
+                    .status(OrderCreditStatus.SERVER_FAILED)
+                    .build();
+            sendToQueue.sendOrderAnalyzeStatus(response);
+            return;
+        }
+        Users user = userRepository.findById(orderAnalyzeVideoDto.getUserId())
+                .orElse(null);
+        if (user == null) {
+            log.info("User not found with the id");
+            OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
+                    .status(OrderCreditStatus.SERVER_FAILED)
+                    .build();
+            sendToQueue.sendOrderAnalyzeStatus(response);
+            return;
+        }
+        if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeVideoDto.getCreditCost()) {
+            log.info("something went wrong in purchase should not pass 0 credit or less than credit cost");
+            OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
+                    .status(OrderCreditStatus.SERVER_FAILED)
+                    .build();
+            sendToQueue.sendOrderAnalyzeStatus(response);
+            return;
+        }
+        long updatedCreditSum = user.getCreditSum() - orderAnalyzeVideoDto.getCreditCost();
+        if (updatedCreditSum < 0) {
+            log.info("not enough credit to purchase analyze video");
+            OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
+                    .status(OrderCreditStatus.PAYMENT_FAILED)
+                    .build();
+            sendToQueue.sendOrderAnalyzeStatus(response);
+            return;
+        }
+        userRepository.save(user);
+        OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
+                .status(OrderCreditStatus.PURCHASED)
+                .orderId(orderAnalyzeVideoDto.getOrderId())
+                .build();
+        sendToQueue.sendOrderAnalyzeStatus(response);
+    }
     /// ***
     /// purchase area
     /// ***

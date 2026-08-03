@@ -1,12 +1,11 @@
 package com.moj.userservice.Configuartion;
 
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -52,6 +51,53 @@ public class RabbitMqConfig {
 
     public static final String ORDER_CREDIT_STATUS_ROUTING_KEY =
             "order-credit-analyzeOrderStatus-routing-key";
+
+    /*
+    * order video analyze queue
+     */
+    public static final String ORDER_ANALYZE_VIDEO_QUEUE = "order-analyze-video-queue";
+
+    /*
+        order video analyze status
+     */
+    public static final String ORDER_ANALYZE_VIDEO_STATUS_EXCHANGE = "order-analyze-video-status-exchange";
+    public static final String ORDER_ANALYZE_VIDEO_STATUS_ROUTING_KEY = "order-analyze-video-analyzeOrderStatus-routing-key";
+    public static final String ORDER_ANALYZE_VIDEO_STATUS_QUEUE = "order-analyze-video-status-queue";
+    /*
+        order status
+     */
+
+    @Bean
+    public Queue orderAnalyzeVideoStatusQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
+                .build();
+    }
+    @Bean
+    public DirectExchange orderAnalyzeVideoStatusExchange() {
+        return new DirectExchange(ORDER_ANALYZE_VIDEO_STATUS_EXCHANGE);
+    }
+    @Bean
+    public Binding orderAnalyzeVideoStatusBinding(@Qualifier("orderAnalyzeVideoStatusQueue")
+            Queue orderAnalyzeVideoStatusQueue,
+            @Qualifier("orderAnalyzeVideoStatusExchange")
+            DirectExchange orderAnalyzeVideoStatusExchange
+    ) {
+        return BindingBuilder
+                .bind(orderAnalyzeVideoStatusQueue)
+                .to(orderAnalyzeVideoStatusExchange)
+                .with(ORDER_ANALYZE_VIDEO_STATUS_ROUTING_KEY);
+    }
+
+    /*
+        order analyze video queue
+     */
+    @Bean
+    public Queue orderAnalyzeVideoQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_VIDEO_QUEUE)
+                .build();
+    }
 
     @Bean
     public Queue orderAnalyzeContentQueue() {

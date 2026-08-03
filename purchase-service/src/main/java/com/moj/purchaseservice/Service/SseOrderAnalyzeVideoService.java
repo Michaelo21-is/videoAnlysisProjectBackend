@@ -1,14 +1,11 @@
 package com.moj.purchaseservice.Service;
 
-import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
-import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
+import com.moj.purchaseservice.Entity.OrderAnalyzeVideo;
+import com.moj.purchaseservice.Repository.OrderAnalyzeVideoRepository;
 import com.moj.purchaseservice.Response.OrderResponse;
-import com.moj.purchaseservice.Utils.CheckOrderStatus;
-import com.moj.purchaseservice.enums.OrderAnalyzeVideoStatus;
 import com.moj.purchaseservice.enums.OrderStatus;
 import com.moj.purchaseservice.enums.Status;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -17,14 +14,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Service
-public class SseOrderAnalyzeContentService {
-
+public class SseOrderAnalyzeVideoService {
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>(); // holding all the order id connetion here
-    private final OrderAnalyzeContentsRepository orderAnalyzeContentsRepository;
-
-    public SseOrderAnalyzeContentService(OrderAnalyzeContentsRepository orderAnalyzeContentsRepository) {
-        this.orderAnalyzeContentsRepository = orderAnalyzeContentsRepository;
+    private final OrderAnalyzeVideoRepository orderAnalyzeVideoRepository;
+    public SseOrderAnalyzeVideoService(OrderAnalyzeVideoRepository orderAnalyzeVideoRepository) {
+        this.orderAnalyzeVideoRepository = orderAnalyzeVideoRepository;
 
     }
 
@@ -81,7 +75,7 @@ public class SseOrderAnalyzeContentService {
             emitter.send(
                     SseEmitter.event()
                             .id(orderId.toString())
-                            .name("analyze-content-status")
+                            .name("order-analyze-video-status")
                             .data(response)
             );
 
@@ -92,12 +86,9 @@ public class SseOrderAnalyzeContentService {
         }
     }
 
-
-
-
     public SseEmitter OrderAnalyzeStatusSSE(Long orderId, UUID userId) {
-        OrderAnalyzeContents order =
-                orderAnalyzeContentsRepository
+        OrderAnalyzeVideo order =
+                orderAnalyzeVideoRepository
                         .findById(orderId)
                         .orElseThrow(() ->
                                 new ResponseStatusException(
@@ -115,19 +106,17 @@ public class SseOrderAnalyzeContentService {
 
         SseEmitter emitter = orderAnalyzeStatusSse(orderId);
 
-        if (order.getStatus() == OrderAnalyzeVideoStatus.PURCHASED) {
+        if (order.getStatus() == OrderStatus.PURCHASED) {
             // checking if already got the message from user service
             OrderResponse response = OrderResponse.builder()
                     .orderId(orderId)
                     .status(Status.SUCCEED)
-                    .message("Order Analyze Content succeeded")
-                    .build();            // sending it to the front
+                    .message("Order Analyze Video succeeded")
+                    .build();
+            // sending it to the front
             sendFinalStatus(orderId, response);
         }
 
         return emitter;
     }
-
-
-
 }
