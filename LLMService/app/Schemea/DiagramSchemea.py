@@ -19,9 +19,17 @@ class DiagramUpdate(BaseModel):
 
     name: str | None = None
     prompt: str | None = None
+    private: bool | None = None
 
-    nodes: list[DiagramNode] | None = None
-    arrows: list[DiagramArrow] | None = None
+    edited_nodes: list[DiagramNode] | None = Field(alias="editedNodes")
+    edited_arrows: list[DiagramArrow] | None = Field(alias="editedArrows")
+
+    removed_nodes: list[str] | None = Field(alias="removedNodes", default=None)
+    removed_arrows: list[str] | None = Field(alias="removedArrows", default=None)
+
+    added_nodes: list[DiagramNode] | None = Field(alias="addedNodes")
+    added_arrows: list[DiagramArrow] | None = Field(alias="addedArrows")
+
 
 
 class DiagramResponse(BaseModel):
@@ -29,6 +37,7 @@ class DiagramResponse(BaseModel):
 
     name: str
     prompt: str = ""
+    private: bool = False
 
     nodes: list[DiagramNode] = Field(default_factory=list)
     arrows: list[DiagramArrow] = Field(default_factory=list)

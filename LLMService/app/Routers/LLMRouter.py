@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Query, status
 
-from app.Schemea.DiagramSchemea import DiagramCreate, DiagramNameListResponse, UserDiagramsResponse, DiagramResponse
+from app.Schemea.DiagramSchemea import DiagramCreate, DiagramNameListResponse, UserDiagramsResponse, DiagramResponse, DiagramUpdate
 from app.Service.DiagramService import DiagramService
 
 
@@ -24,6 +24,9 @@ def create_diagram(
         diagram=diagram,
         user_id=user_id,
     )
+@router.put("/update-diagram", status_code=status.HTTP_201_CREATED)
+def update_diagram(diagram: DiagramUpdate, user_id: Annotated[UUID, Header(alias="X-USER-ID")]) -> None:
+    diagram_service.update_diagram(diagram=diagram, user_id=user_id)
 
 
 @router.get("/user-diagrams/recent",status_code=status.HTTP_200_OK,)
