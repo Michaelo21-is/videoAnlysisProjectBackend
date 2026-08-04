@@ -6,6 +6,7 @@ import com.moj.purchaseservice.Response.OrderResponse;
 import com.moj.purchaseservice.enums.OrderStatus;
 import com.moj.purchaseservice.enums.Status;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Service
 public class SseOrderAnalyzeVideoService {
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>(); // holding all the order id connetion here
     private final OrderAnalyzeVideoRepository orderAnalyzeVideoRepository;
@@ -75,17 +77,35 @@ public class SseOrderAnalyzeVideoService {
             emitter.send(
                     SseEmitter.event()
                             .id(orderId.toString())
-                            .name("order-analyze-video-status")
+                            .name("order-analyze-video-final-status")
                             .data(response)
             );
 
             emitter.complete();
 
         } catch (IOException | IllegalStateException exception) {
+            emitters.remove(orderId, emitter);
             emitter.completeWithError(exception);
         }
     }
-
+    public void sendStatus(Long orderId, OrderResponse response) {
+        SseEmitter emitter = emitters.get(orderId);
+        if (emitter == null) {
+            return;
+        }
+        try {
+            emitter.send(
+                    SseEmitter.event()
+                            .id(orderId.toString())
+                            .name("order-analyze-video-final-status")
+                            .data(response)
+            );
+        }
+        catch(IOException | IllegalStateException exception){
+            emitters.remove(orderId, emitter);
+            emitter.completeWithError(exception);
+        }
+    }
     public SseEmitter OrderAnalyzeStatusSSE(Long orderId, UUID userId) {
         OrderAnalyzeVideo order =
                 orderAnalyzeVideoRepository

@@ -242,20 +242,25 @@ public class PurchaseService {
             case SUCCEED -> {
                 order.setStatus(OrderStatus.PURCHASED);
                 orderAnalyzeVideoRepository.save(order);
-                sseOrderAnalyzeVideoService.sendFinalStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
+                sseOrderAnalyzeVideoService.sendStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
                         .orderId(orderStatusDto.getOrderId())
                         .status(Status.SUCCEED)
                         .message("Order analyze video succeeded")
                         .build());
             }
             case PAYMENT_FAILED -> {
-
-            }
-            case SERVER_FAILED -> {
-
+                sseOrderAnalyzeContentService.sendFinalStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
+                        .orderId(orderStatusDto.getOrderId())
+                        .status(Status.PAYMENT_FAILED)
+                        .message("Not enough credits in your account")
+                        .build());
             }
             default -> {
-
+                sseOrderAnalyzeContentService.sendFinalStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
+                        .orderId(orderStatusDto.getOrderId())
+                        .status(Status.SERVER_FAILED)
+                        .message("Not enough credits in your account")
+                        .build());
             }
         }
     }
