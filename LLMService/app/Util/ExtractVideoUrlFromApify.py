@@ -6,27 +6,38 @@ def extract_tiktok_media(item: dict[str, Any]) -> dict[str, Any]:
         error_message = item.get("error") or "Unknown Apify error"
         raise RuntimeError(f"{error_code}: {error_message}")
 
+    video_name = item.get("text")
+    if not isinstance(video_name, str) or not video_name.strip():
+        raise ValueError("Apify did not return the TikTok video name")
+
+    video_name = video_name.strip()
+
     if item.get("isSlideshow") is True:
         slideshow_images = item.get("slideshowImageLinks") or []
-
-        image_urls = []
+        image_urls: list[str] = []
 
         for image in slideshow_images:
             if not isinstance(image, dict):
                 continue
 
-            image_url = image.get("downloadLink") or image.get("tiktokLink")
+            image_url = (
+                image.get("downloadLink")
+                or image.get("tiktokLink")
+            )
 
-            if isinstance(image_url, str) and image_url.startswith(
-                ("https://", "http://")
+            if (
+                isinstance(image_url, str)
+                and image_url.startswith(("https://", "http://"))
             ):
                 image_urls.append(image_url)
 
         if not image_urls:
-            raise ValueError("Apify did not return slideshow images")
+            raise ValueError(
+                "Apify did not return TikTok slideshow download URLs"
+            )
 
         return {
-            "type": "slideshow",
+            "name": video_name,
             "urls": image_urls,
         }
 
@@ -40,12 +51,112 @@ def extract_tiktok_media(item: dict[str, Any]) -> dict[str, Any]:
     ]
 
     for video_url in possible_urls:
-        if isinstance(video_url, str) and video_url.startswith(
-            ("https://", "http://")
+        if (
+            isinstance(video_url, str)
+            and video_url.startswith(("https://", "http://"))
         ):
             return {
-                "type": "video",
+                "name": video_name,
                 "urls": [video_url],
             }
 
-    raise ValueError("Apify did not return TikTok media")
+    raise ValueError(
+        "Apify did not return the TikTok video download URL"
+    )
+def extract_instagram_reel_media(  item: dict[str, Any],) -> dict[str, Any]:
+    if error_code := item.get("error"):
+        error_description = (
+            item.get("errorDescription")
+            or "Unknown Instagram scraping error"
+        )
+        raise RuntimeError(
+            f"{error_code}: {error_description}"
+        )
+
+    reel_name = item.get("caption")
+
+    if not isinstance(reel_name, str) or not reel_name.strip():
+        raise ValueError(
+            "Apify did not return the Instagram Reel name"
+        )
+
+    downloaded_video_url = item.get("downloadedVideo")
+
+    if (
+        not isinstance(downloaded_video_url, str)
+        or not downloaded_video_url.startswith(
+            ("https://", "http://")
+        )
+    ):
+        raise ValueError(
+            "Apify did not return the Instagram Reel download URL"
+        )
+
+    return {
+        "name": reel_name.strip(),
+        "urls": [downloaded_video_url],
+    }
+def extract_twitter_video_media(item: dict[str, Any]) -> dict[str, Any]:
+    status = item.get("status")
+
+    if status == "failed":
+        raise RuntimeError(
+            item.get("error")
+            or "Twitter video extraction failed"
+        )
+
+    if status == "no_media":
+        raise ValueError(
+            "The X post does not contain video media"
+        )
+
+    if status != "success":
+        raise ValueError(
+            f"Unexpected Twitter Actor status: {status}"
+        )
+
+    if item.get("mediaType") != "video":
+        raise ValueError(
+            "The X post does not contain a video"
+        )
+
+    download_url = item.get("downloadUrl")
+
+    if (
+            not isinstance(download_url, str)
+            or not download_url.startswith(("https://", "http://"))
+    ):
+        raise ValueError(
+            "Apify did not return the Twitter video download URL"
+        )
+
+    video_name = (
+            item.get("displayText")
+            or item.get("text")
+            or f"X video {item.get('tweetId', '')}"
+    )
+
+    return {
+        "name": str(video_name).strip(),
+        "urls": [download_url],
+    }
+def extract_facebook_video_media(item: dict[str, Any],) -> dict[str, Any]:
+    download_url = item.get("download_url")
+    if (
+        not isinstance(download_url, str)
+        or not download_url.startswith(("https://", "http://"))
+    ):
+        raise ValueError(
+            "Apify did not return the Facebook video download URL"
+        )
+
+    video_name = (
+        item.get("title")
+        or item.get("description")
+        or f"Facebook video {item.get('id', '')}"
+    )
+
+    return {
+        "name": str(video_name).strip() or "Facebook video",
+        "urls": [download_url],
+    }

@@ -4,3 +4,5 @@ pydantic
 pymongo
 python-dotenv
 apify-client
+google-genai==2.16.0
+aio-pika

@@ -158,7 +158,7 @@ services:
       MONGODB_URL: ${MONGODB_URL}
       MONGODB_DATABASE: ${MONGODB_DATABASE}
       APIFY_API: ${APIFY_API}
-      GEMINI_API: ${GEMINI_API}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
 
 
   api-gateway:

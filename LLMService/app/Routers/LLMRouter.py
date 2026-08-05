@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Query, status
 
-from app.Schemea.DiagramSchemea import DiagramCreate, DiagramNameListResponse, UserDiagramsResponse, DiagramResponse, DiagramUpdate
+from app.Schemea.DiagramSchema import DiagramCreate, DiagramNameListResponse, UserDiagramsResponse, DiagramResponse, DiagramUpdate
 from app.Service.DiagramService import DiagramService
 
 

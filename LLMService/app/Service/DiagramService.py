@@ -6,7 +6,7 @@ from typing import Any
 
 from app.Config.DatabaseConfig import get_database
 from app.Model.DiagramModel import DiagramDocument
-from app.Schemea.DiagramSchemea import (DiagramCreate, DiagramNameListResponse
+from app.Schemea.DiagramSchema import (DiagramCreate, DiagramNameListResponse
 , DiagramNameResponse, UserDiagramsResponse, DiagramResponse, DiagramUpdate)
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class DiagramService:
             logger.exception("Error initializing diagram database collection")
             raise
 
-    def create_diagram( self, diagram: DiagramCreate, user_id: UUID  ) -> None:
+    async def create_diagram( self, diagram: DiagramCreate, user_id: UUID  ) -> None:
         try:
             now = datetime.now()
 
@@ -61,7 +61,7 @@ class DiagramService:
             )
             raise
 
-    def update_diagram(
+    async def update_diagram(
             self,
             diagram: DiagramUpdate,
             user_id: UUID,
@@ -196,7 +196,7 @@ class DiagramService:
             )
             raise
 
-    def get_recent_user_diagrams(self, user_id: UUID, limit: int = 5,) -> DiagramNameListResponse:
+    async def get_recent_user_diagrams(self, user_id: UUID, limit: int = 5,) -> DiagramNameListResponse:
         try:
 
             documents = list(
@@ -232,7 +232,7 @@ class DiagramService:
                 user_id,
             )
             raise
-    def get_user_diagrams(self, user_id: UUID, page: int = 1, limit: int = 9, firstTimeRequest: bool = False) -> UserDiagramsResponse:
+    async def get_user_diagrams(self, user_id: UUID, page: int = 1, limit: int = 9, firstTimeRequest: bool = False) -> UserDiagramsResponse:
         try:
             skip = (page - 1) * limit
             totalPages: int | None = None
@@ -275,7 +275,7 @@ class DiagramService:
             )
             raise
 
-    def get_diagram_by_query(
+    async def get_diagram_by_query(
             self,
             query: str,
             user_id: UUID,
@@ -338,11 +338,8 @@ class DiagramService:
                 query,
             )
             raise
-    def get_diagram(self, diagram_id: str, user_id: UUID) -> DiagramResponse:
+    async def get_diagram(self, diagram_id: str, user_id: UUID) -> DiagramResponse:
         try:
-
-
-
             document = self.diagram_collection.find_one({
                 "_id": diagram_id,
             })
