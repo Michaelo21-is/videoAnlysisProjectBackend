@@ -1,5 +1,5 @@
 from typing import Any
-
+from app.Util.CheckUrlPlatform import Platform
 
 def extract_tiktok_media(item: dict[str, Any]) -> dict[str, Any]:
     if error_code := item.get("errorCode"):
@@ -39,6 +39,7 @@ def extract_tiktok_media(item: dict[str, Any]) -> dict[str, Any]:
         return {
             "name": video_name,
             "urls": image_urls,
+            "platform": Platform.TIKTOK
         }
 
     video_meta = item.get("videoMeta") or {}
@@ -58,6 +59,7 @@ def extract_tiktok_media(item: dict[str, Any]) -> dict[str, Any]:
             return {
                 "name": video_name,
                 "urls": [video_url],
+                "platform": Platform.TIKTOK
             }
 
     raise ValueError(
@@ -95,8 +97,9 @@ def extract_instagram_reel_media(  item: dict[str, Any],) -> dict[str, Any]:
     return {
         "name": reel_name.strip(),
         "urls": [downloaded_video_url],
+        "platform": Platform.INSTAGRAM
     }
-def extract_twitter_video_media(item: dict[str, Any]) -> dict[str, Any]:
+def extract_X_video_media(item: dict[str, Any]) -> dict[str, Any]:
     status = item.get("status")
 
     if status == "failed":
@@ -139,6 +142,7 @@ def extract_twitter_video_media(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": str(video_name).strip(),
         "urls": [download_url],
+        "platform": Platform.X
     }
 def extract_facebook_video_media(item: dict[str, Any],) -> dict[str, Any]:
     download_url = item.get("download_url")
@@ -159,4 +163,5 @@ def extract_facebook_video_media(item: dict[str, Any],) -> dict[str, Any]:
     return {
         "name": str(video_name).strip() or "Facebook video",
         "urls": [download_url],
+        "platform": Platform.FACEBOOK
     }

@@ -3,6 +3,7 @@ package com.moj.purchaseservice.Service;
 import com.moj.purchaseservice.Entity.OrderAnalyzeVideo;
 import com.moj.purchaseservice.Repository.OrderAnalyzeVideoRepository;
 import com.moj.purchaseservice.Response.OrderResponse;
+import com.moj.purchaseservice.Response.VideoAnalyzerDiagramResponse;
 import com.moj.purchaseservice.enums.OrderStatus;
 import com.moj.purchaseservice.enums.Status;
 import org.springframework.http.HttpStatus;
@@ -65,9 +66,9 @@ public class SseOrderAnalyzeVideoService {
         return emitter;
     }
     // when the listenr get the message from the user-service it update the user aswell
-    public void sendFinalStatus(Long orderId, OrderResponse response) {
+    public void sendFinalStatus( VideoAnalyzerDiagramResponse response) {
 
-        SseEmitter emitter = emitters.remove(orderId);
+        SseEmitter emitter = emitters.remove(response.getOrderId());
 
         if (emitter == null) {
             return;
@@ -76,7 +77,7 @@ public class SseOrderAnalyzeVideoService {
         try {
             emitter.send(
                     SseEmitter.event()
-                            .id(orderId.toString())
+                            .id(response.getOrderId().toString())
                             .name("order-analyze-video-final-status")
                             .data(response)
             );
@@ -84,7 +85,7 @@ public class SseOrderAnalyzeVideoService {
             emitter.complete();
 
         } catch (IOException | IllegalStateException exception) {
-            emitters.remove(orderId, emitter);
+            emitters.remove(response.getOrderId(), emitter);
             emitter.completeWithError(exception);
         }
     }

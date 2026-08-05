@@ -13,9 +13,9 @@ from aio_pika.abc import (
 
 RABBITMQ_URL = "amqp://guest:guest@localhost:5672/"
 
-EXCHANGE_NAME = "analyze_video_exchange"
-QUEUE_NAME = "analyze_video_queue"
-ROUTING_KEY = "analyze_video_routing_key"
+EXCHANGE_NAME = "analyze-video-exchange"
+QUEUE_NAME = "analyze-video-queue"
+ROUTING_KEY = "analyze-video-routing-key"
 
 
 class RabbitMQManager:

@@ -1,7 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel
 from app.Schemea.DiagramSchema import DiagramResponse
-from uuid import UUID
 from fastapi import UploadFile, File
 
 class AnalyzeVideoStatus(str, Enum):
@@ -20,6 +19,5 @@ class AnalyzeVideoSchema(BaseModel):
 class AnalyzeVideoResponse(BaseModel):
     diagram: DiagramResponse | None = None
     order_id: int
-    user_id: UUID
     message: str
     status: AnalyzeVideoStatus

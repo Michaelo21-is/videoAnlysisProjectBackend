@@ -264,6 +264,17 @@ public class PurchaseService {
             }
         }
     }
+    @RabbitListener(queues = RabbitMqConfig.ANALYZE_VIDEO_QUEUE)
+    public void analyzeVideoResponse(VideoAnalyzerDiagramResponse videoAnalyzerDiagramResponse){
+        OrderAnalyzeVideo order = orderAnalyzeVideoRepository.findById(videoAnalyzerDiagramResponse.getOrderId())
+                .orElse(null);
+        if (order == null) {
+            log.error("Order id is not found in the database: \n{}", videoAnalyzerDiagramResponse.getOrderId());
+        }
+        order.setStatus(OrderStatus.SUCCEED);
+        orderAnalyzeVideoRepository.save(order);
+        sseOrderAnalyzeVideoService.sendFinalStatus(videoAnalyzerDiagramResponse);
+    }
     /*
         order analyze video
      */

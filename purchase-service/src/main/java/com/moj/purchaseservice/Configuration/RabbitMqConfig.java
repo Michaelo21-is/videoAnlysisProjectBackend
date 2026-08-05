@@ -84,6 +84,18 @@ public class RabbitMqConfig {
      */
     public static final String ORDER_ANALYZE_VIDEO_STATUS_QUEUE = "order-analyze-video-status-queue";
     /*
+        order video analyze queue
+     */
+
+    public static final String ANALYZE_VIDEO_QUEUE = "analyze-video-queue";
+    @Bean
+    public Queue analyzeVideoQueue() {
+        return QueueBuilder
+                .durable(ANALYZE_VIDEO_QUEUE)
+                .build();
+    }
+
+    /*
         order analyze status request configuration
      */
     @Bean

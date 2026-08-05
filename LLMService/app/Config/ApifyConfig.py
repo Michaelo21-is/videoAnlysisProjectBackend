@@ -3,7 +3,7 @@ import os
 from app.Util.ExtractVideoUrlFromApify import (
     extract_instagram_reel_media,
     extract_tiktok_media,
-    extract_twitter_video_media,
+    extract_X_video_media,
 )
 from typing import Any
 
@@ -63,7 +63,7 @@ def get_x_video_with_url(url: str) -> dict[str, Any]:
     )
 
     for item in client.dataset(result["defaultDatasetId"]).iterate_items():
-        return extract_twitter_video_media(item)
+        return extract_X_video_media(item)
 
     raise ValueError("No Twitter video was found")
 def get_facebook_video_with_url(url: str) -> dict[str, Any]:

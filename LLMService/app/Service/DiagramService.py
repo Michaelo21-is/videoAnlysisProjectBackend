@@ -361,8 +361,6 @@ class DiagramService:
                 prompt=document["prompt"],
                 nodes=document["nodes"],
                 arrows=document["arrows"],
-                createdAt=document["createdAt"],
-                updatedAt=document["updatedAt"],
                 private=document["private"],
             )
 

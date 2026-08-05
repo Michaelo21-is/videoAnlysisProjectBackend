@@ -1,9 +1,13 @@
 from uuid import UUID
 from app.Config.ApifyConfig import get_tiktok_video_with_url, get_instagram_video_with_url, get_facebook_video_with_url, get_x_video_with_url
 from app.Config.RabitMqConfig import rabbitmq_manager
+from app.Routers.LLMRouter import create_diagram
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus
-from app.Config.GeminiConfig import analyze_video
+from app.Schemea.DiagramSchema import DiagramResponse
+from app.Config.GeminiConfig import analyze_video_url, analyze_video_file
 from app.Util.CheckUrlPlatform import check_url_platform, Platform
+from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
+from app.Service.DiagramService import DiagramService
 import logging
 import asyncio
 
@@ -57,6 +61,7 @@ class LLMService:
                 video_details = {
                     "name": None,
                     "urls": [analyze_video_schema.video_url],
+                    "platform": Platform.YOUTUBE,
                 }
             else:
                 logger.exception("Video URL is not supported")
@@ -71,20 +76,28 @@ class LLMService:
                     exchange= "video-analysis-exchange",
                 )
                 return
-            prompt = "not a true prompt"
-            diagram = analyze_video(video_details["url"], prompt)
+            prompt = build_video_url_analysis_prompt(video_details["platform"], video_details["name"])
+            diagram_create  = await asyncio.to_thread(analyze_video_url,video_details["urls"][0],prompt,)
+            await asyncio.to_thread(DiagramService.create_diagram, diagram_create, user_id,)
+            diagram_response = DiagramResponse(
+                name=diagram_create.name,
+                private=True,
+                prompt=diagram_create.prompt,
+                nodes=diagram_create.nodes,
+                arrows=diagram_create.arrows,
+            )
             response = AnalyzeVideoResponse(
                 status=AnalyzeVideoStatus.SUCCEED,
                 message="Video analyzed successfully",
                 order_id=analyze_video_schema.order_id,
                 user_id=user_id,
-                diagram=diagram,
+                diagram=diagram_response,
             )
             rabbitmq_manager.publish_message(
                 message= response,
                 exchange= "video-analysis-exchange",
             )
-        if analyze_video_schema.video_mp4 is not None:
+        elif analyze_video_schema.video_mp4 is not None:
             if analyze_video_schema.video_mp4.filename.endswith(".mp4") is not True:
                 logger.exception("Video MP4 is not a valid MP4 file")
                 response = AnalyzeVideoResponse(
@@ -105,7 +118,6 @@ class LLMService:
                     status=AnalyzeVideoStatus.SERVER_FAILED,
                     message="Video MP4 is too large should be less than 100MB",
                     order_id=analyze_video_schema.order_id,
-                    user_id=user_id,
                 )
                 rabbitmq_manager.publish_message(
                     message= response,
@@ -113,12 +125,20 @@ class LLMService:
                     routing_key= "analyze_video_routing_key",
                 )
                 return
-            diagram = analyze_video()
+            prompt = build_video_file_analysis_prompt()
+            create_diagram = await asyncio.to_thread(analyze_video_file, analyze_video_schema.video_mp4.file, prompt,)
+            diagram = await asyncio.to_thread(DiagramService.create_diagram, create_diagram, user_id,)
+            diagram = DiagramResponse(
+                name=diagram.name,
+                private=True,
+                prompt=diagram.prompt,
+                nodes=diagram.nodes,
+                arrows=diagram.arrows,
+            )
             response = AnalyzeVideoResponse(
                 status=AnalyzeVideoStatus.SUCCEED,
                 message="Video analyzed successfully",
                 order_id=analyze_video_schema.order_id,
-                user_id=user_id,
                 diagram=diagram,
             )
             rabbitmq_manager.publish_message(

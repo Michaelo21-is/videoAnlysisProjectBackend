@@ -42,8 +42,6 @@ class DiagramResponse(BaseModel):
     nodes: list[DiagramNode] = Field(default_factory=list)
     arrows: list[DiagramArrow] = Field(default_factory=list)
 
-    created_at: datetime = Field(alias="createdAt")
-    updated_at: datetime = Field(alias="updatedAt")
 
 class DiagramNameResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
