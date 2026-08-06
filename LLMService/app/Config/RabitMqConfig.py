@@ -1,5 +1,6 @@
 import json
 from typing import Any
+import os
 
 import aio_pika
 from aio_pika import DeliveryMode, ExchangeType, Message
@@ -7,65 +8,98 @@ from aio_pika.abc import (
     AbstractRobustChannel,
     AbstractRobustConnection,
     AbstractRobustExchange,
-    AbstractRobustQueue,
+)
+from pydantic import BaseModel
+
+
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
+RABBITMQ_PORT = os.getenv("RABBITMQ_PORT", "5672")
+RABBITMQ_USERNAME = os.getenv("RABBITMQ_USERNAME", "guest")
+RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "guest")
+
+RABBITMQ_URL = (
+    f"amqp://{RABBITMQ_USERNAME}:{RABBITMQ_PASSWORD}"
+    f"@{RABBITMQ_HOST}:{RABBITMQ_PORT}/"
 )
 
+VIDEO_ANALYSIS_EXCHANGE = "video-analyze-exchange"
 
-RABBITMQ_URL = "amqp://guest:guest@localhost:5672/"
+ANALYZE_VIDEO_RESPONSE_QUEUE = "analyze-video-response-queue"
+ANALYZE_VIDEO_RESPONSE_ROUTING_KEY = "analyze_video_response_routing_key"
 
-EXCHANGE_NAME = "analyze-video-exchange"
-QUEUE_NAME = "analyze-video-queue"
-ROUTING_KEY = "analyze-video-routing-key"
+SCRAPING_FINISHED_QUEUE = "scraping-finished-queue"
+SCRAPING_FINISHED_ROUTING_KEY = "scraping_finished_routing_key"
+
+ANALYZE_VIDEO_QUEUE = "analyze-video-queue"
+
 
 
 class RabbitMQManager:
     def __init__(self, url: str):
         self.url = url
-
         self.connection: AbstractRobustConnection | None = None
         self.channel: AbstractRobustChannel | None = None
         self.exchange: AbstractRobustExchange | None = None
-        self.queue: AbstractRobustQueue | None = None
 
     async def connect(self) -> None:
-        # 1. Connection
         self.connection = await aio_pika.connect_robust(self.url)
-
-        # 2. Channel
         self.channel = await self.connection.channel()
 
-        # 3. Exchange
         self.exchange = await self.channel.declare_exchange(
-            name=EXCHANGE_NAME,
+            name=VIDEO_ANALYSIS_EXCHANGE,
             type=ExchangeType.DIRECT,
             durable=True,
         )
 
-        # 4. Queue
-        self.queue = await self.channel.declare_queue(
-            name=QUEUE_NAME,
+        analyze_video_queue = await self.channel.declare_queue(
+            name=ANALYZE_VIDEO_QUEUE,
             durable=True,
         )
 
-        # 5. Binding: Exchange -> Queue
-        await self.queue.bind(
-            exchange=self.exchange,
-            routing_key=ROUTING_KEY,
+        analyze_video_queue_response = await self.channel.declare_queue(
+            name=ANALYZE_VIDEO_RESPONSE_QUEUE,
+            durable=True,
         )
 
-    async def publish(self, payload: dict[str, Any]) -> None:
+        await analyze_video_queue_response.bind(
+            exchange=self.exchange,
+            routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
+        )
+
+        scraping_finished_queue = await self.channel.declare_queue(
+            name=SCRAPING_FINISHED_QUEUE,
+            durable=True,
+        )
+
+        await scraping_finished_queue.bind(
+            exchange=self.exchange,
+            routing_key=SCRAPING_FINISHED_ROUTING_KEY,
+        )
+
+    async def consume_analyze_video(self, ):
+
+    async def publish(
+        self,
+        payload: dict[str, Any] | BaseModel,
+        routing_key: str,
+    ) -> None:
         if self.exchange is None:
             raise RuntimeError("RabbitMQ exchange is not initialized")
 
+        if isinstance(payload, BaseModel):
+            serialized_payload = payload.model_dump(mode="json")
+        else:
+            serialized_payload = payload
+
         message = Message(
-            body=json.dumps(payload).encode("utf-8"),
+            body=json.dumps(serialized_payload).encode("utf-8"),
             content_type="application/json",
             delivery_mode=DeliveryMode.PERSISTENT,
         )
 
         await self.exchange.publish(
             message=message,
-            routing_key=ROUTING_KEY,
+            routing_key=routing_key,
         )
 
     async def close(self) -> None:
@@ -75,7 +109,6 @@ class RabbitMQManager:
         self.connection = None
         self.channel = None
         self.exchange = None
-        self.queue = None
 
 
 rabbitmq_manager = RabbitMQManager(RABBITMQ_URL)

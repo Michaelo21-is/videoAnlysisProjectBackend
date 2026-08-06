@@ -22,7 +22,7 @@ class DiagramService:
             logger.exception("Error initializing diagram database collection")
             raise
 
-    async def create_diagram( self, diagram: DiagramCreate, user_id: UUID  ) -> None:
+    def create_diagram( self, diagram: DiagramCreate, user_id: UUID  ) -> str:
         try:
             now = datetime.now()
 
@@ -47,11 +47,8 @@ class DiagramService:
 
             result = self.diagram_collection.insert_one(document_data)
 
-            logger.info(
-                "Diagram created successfully: diagram_id=%s, user_id=%s",
-                result.inserted_id,
-                user_id,
-            )
+            diagram_id = str(result.inserted_id)
+            return diagram_id
 
         except Exception:
             logger.exception(
@@ -61,7 +58,7 @@ class DiagramService:
             )
             raise
 
-    async def update_diagram(
+    def update_diagram(
             self,
             diagram: DiagramUpdate,
             user_id: UUID,
@@ -196,7 +193,7 @@ class DiagramService:
             )
             raise
 
-    async def get_recent_user_diagrams(self, user_id: UUID, limit: int = 5,) -> DiagramNameListResponse:
+    def get_recent_user_diagrams(self, user_id: UUID, limit: int = 5,) -> DiagramNameListResponse:
         try:
 
             documents = list(
@@ -232,7 +229,7 @@ class DiagramService:
                 user_id,
             )
             raise
-    async def get_user_diagrams(self, user_id: UUID, page: int = 1, limit: int = 9, firstTimeRequest: bool = False) -> UserDiagramsResponse:
+    def get_user_diagrams(self, user_id: UUID, page: int = 1, limit: int = 9, firstTimeRequest: bool = False) -> UserDiagramsResponse:
         try:
             skip = (page - 1) * limit
             totalPages: int | None = None
@@ -275,7 +272,7 @@ class DiagramService:
             )
             raise
 
-    async def get_diagram_by_query(
+    def get_diagram_by_query(
             self,
             query: str,
             user_id: UUID,
@@ -338,7 +335,7 @@ class DiagramService:
                 query,
             )
             raise
-    async def get_diagram(self, diagram_id: str, user_id: UUID) -> DiagramResponse:
+    def get_diagram(self, diagram_id: str, user_id: UUID) -> DiagramResponse:
         try:
             document = self.diagram_collection.find_one({
                 "_id": diagram_id,

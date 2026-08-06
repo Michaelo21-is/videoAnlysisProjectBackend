@@ -3,8 +3,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Query, status
 
+from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema
 from app.Schemea.DiagramSchema import DiagramCreate, DiagramNameListResponse, UserDiagramsResponse, DiagramResponse, DiagramUpdate
 from app.Service.DiagramService import DiagramService
+from app.Service.LLMService import LLMService
 
 
 router = APIRouter(prefix="/api/llm", tags=["LLM"])

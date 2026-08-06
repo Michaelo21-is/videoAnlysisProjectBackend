@@ -169,6 +169,7 @@ public class UserService {
                 .orderId(orderAnalyzeVideoDto.getOrderId())
                 .build();
         sendToQueue.sendOrderAnalyzeStatus(response);
+        sendToQueue.sendOrderToAnalyzeVideo(orderAnalyzeVideoDto);
     }
     /// ***
     /// purchase area

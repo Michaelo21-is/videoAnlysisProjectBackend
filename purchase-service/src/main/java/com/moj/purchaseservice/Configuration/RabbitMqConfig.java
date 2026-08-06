@@ -16,78 +16,36 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-    /*
-     * Analyze-content request:
-     * purchase-service publishes,
-     * user-service consumes.
-     */
-    public static final String ORDER_ANALYZE_CONTENT_EXCHANGE =
-            "order-analyze-content-exchange";
 
-    public static final String ORDER_ANALYZE_CONTENT_QUEUE =
-            "order-analyze-content-queue";
+    public static final String ORDER_ANALYZE_CONTENT_EXCHANGE = "order-analyze-content-exchange";
+    public static final String ORDER_ANALYZE_CONTENT_QUEUE = "order-analyze-content-queue";
+    public static final String ORDER_ANALYZE_CONTENT_ROUTING_KEY = "order.analyze.content";
 
-    public static final String ORDER_ANALYZE_CONTENT_ROUTING_KEY =
-            "order.analyze.content";
 
-    /*
-     * Analyze-content result:
-     * user-service publishes,
-     * purchase-service consumes.
-     */
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE =
-            "order-analyze-content-status-queue";
+    public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE = "order-analyze-content-status-queue";
+    public static final String ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE = "order-analyze-content-status-exchange";
+    public static final String ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY = "order-analyze-content-analyzeOrderStatus-routing-key";
 
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE =
-            "order-analyze-content-status-exchange";
 
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY =
-            "order-analyze-content-analyzeOrderStatus-routing-key";
+    public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
+    public static final String ORDER_CREDIT_EXCHANGE = "order-credit-exchange";
+    public static final String ORDER_CREDIT_ROUTING_KEY = "order.credit";
 
-    /*
-     * Credit purchase request:
-     * purchase-service publishes,
-     * user-service consumes.
-     */
-    public static final String ORDER_CREDIT_QUEUE =
-            "order-credit-queue";
 
-    public static final String ORDER_CREDIT_EXCHANGE =
-            "order-credit-exchange";
+    public static final String ORDER_CREDIT_STATUS_QUEUE = "order-credit-purchase-status-queue";
+    public static final String ORDER_CREDIT_STATUS_EXCHANGE = "order-credit-status-exchange";
+    public static final String ORDER_CREDIT_STATUS_ROUTING_KEY = "order-credit-analyzeOrderStatus-routing-key";
 
-    public static final String ORDER_CREDIT_ROUTING_KEY =
-            "order.credit";
-
-    /*
-     * Credit update result:
-     * this queue belongs only to purchase-service.
-     */
-    public static final String ORDER_CREDIT_STATUS_QUEUE =
-            "order-credit-purchase-status-queue";
-
-    public static final String ORDER_CREDIT_STATUS_EXCHANGE =
-            "order-credit-status-exchange";
-
-    public static final String ORDER_CREDIT_STATUS_ROUTING_KEY =
-            "order-credit-analyzeOrderStatus-routing-key";
-    /*
-    * order analyze video
-     */
-    public static final String ORDER_ANALYZE_VIDEO_EXCHANGE = "order-analyze-video-exchange";
+    public static final String ANALYZE_VIDEO_EXCHANGE = "video-analyze-exchange";
     public static final String ORDER_ANALYZE_VIDEO_QUEUE = "order-analyze-video-queue";
     public static final String ORDER_ANALYZE_VIDEO_ROUTING_KEY = "order.analyze.video";
-    /*
-     * order analyze video
-     */
-    /*
-        order analyze video status
-     */
-    public static final String ORDER_ANALYZE_VIDEO_STATUS_QUEUE = "order-analyze-video-status-queue";
-    /*
-        order video analyze queue
-     */
 
-    public static final String ANALYZE_VIDEO_QUEUE = "analyze-video-queue";
+    public static final String ORDER_ANALYZE_VIDEO_STATUS_QUEUE = "order-analyze-video-status-queue";
+
+    public static final String ANALYZE_VIDEO_QUEUE = "analyze-video-response-queue";
+
+    public static final String SCRAPING_FINISHED_QUEUE = "scraping-finished-queue";
+
     @Bean
     public Queue analyzeVideoQueue() {
         return QueueBuilder
@@ -95,9 +53,13 @@ public class RabbitMqConfig {
                 .build();
     }
 
-    /*
-        order analyze status request configuration
-     */
+    @Bean
+    public Queue scrapingFinishedQueue() {
+        return QueueBuilder
+                .durable(SCRAPING_FINISHED_QUEUE)
+                .build();
+    }
+
     @Bean
     public Queue orderAnalyzeVideoStatusQueue() {
         return QueueBuilder
@@ -105,9 +67,6 @@ public class RabbitMqConfig {
                 .build();
     }
 
-    /*
-     * Analyze-content request configuration.
-     */
     @Bean
     public DirectExchange orderAnalyzeContentExchange() {
         return new DirectExchange(
@@ -133,9 +92,6 @@ public class RabbitMqConfig {
                 .with(ORDER_ANALYZE_CONTENT_ROUTING_KEY);
     }
 
-    /*
-     * Analyze-content status configuration.
-     */
     @Bean
     public DirectExchange orderAnalyzeContentStatusExchange() {
         return new DirectExchange(
@@ -162,9 +118,7 @@ public class RabbitMqConfig {
                 .with(ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY);
     }
 
-    /*
-     * Credit purchase request configuration.
-     */
+
     @Bean
     public DirectExchange orderCreditExchange() {
         return new DirectExchange(
@@ -190,9 +144,7 @@ public class RabbitMqConfig {
                 .with(ORDER_CREDIT_ROUTING_KEY);
     }
 
-    /*
-     * Credit status configuration for purchase-service.
-     */
+
     @Bean
     public DirectExchange orderCreditStatusExchange() {
         return new DirectExchange(
@@ -217,13 +169,11 @@ public class RabbitMqConfig {
                 .to(exchange)
                 .with(ORDER_CREDIT_STATUS_ROUTING_KEY);
     }
-    /*
-        order analysis request
-     */
+
     @Bean
     public DirectExchange orderAnalyzeVideoExchange() {
         return new DirectExchange(
-                ORDER_ANALYZE_VIDEO_EXCHANGE
+                ANALYZE_VIDEO_EXCHANGE
         );
     }
     @Bean

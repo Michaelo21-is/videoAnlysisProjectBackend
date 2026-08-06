@@ -3,9 +3,9 @@ package com.moj.purchaseservice.Service;
 import com.moj.purchaseservice.Entity.OrderAnalyzeVideo;
 import com.moj.purchaseservice.Repository.OrderAnalyzeVideoRepository;
 import com.moj.purchaseservice.Response.OrderResponse;
+import com.moj.purchaseservice.Response.ScrapingCompleteResponse;
 import com.moj.purchaseservice.Response.VideoAnalyzerDiagramResponse;
 import com.moj.purchaseservice.enums.OrderStatus;
-import com.moj.purchaseservice.enums.Status;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,7 +27,7 @@ public class SseOrderAnalyzeVideoService {
 
     public SseEmitter orderAnalyzeStatusSse(Long orderId) {
         SseEmitter emitter =
-                new SseEmitter(10 * 60 * 1000L); ;// 10 min connection if time pass closing it
+                new SseEmitter(10 * 60 * 1000L); // 10 min connection if time pass closing it
 
         SseEmitter previousEmitter =
                 emitters.put(orderId, emitter);
@@ -66,7 +66,7 @@ public class SseOrderAnalyzeVideoService {
         return emitter;
     }
     // when the listenr get the message from the user-service it update the user aswell
-    public void sendFinalStatus( VideoAnalyzerDiagramResponse response) {
+    public void sendFinalStatusDiagram(VideoAnalyzerDiagramResponse response) {
 
         SseEmitter emitter = emitters.remove(response.getOrderId());
 
@@ -78,12 +78,31 @@ public class SseOrderAnalyzeVideoService {
             emitter.send(
                     SseEmitter.event()
                             .id(response.getOrderId().toString())
-                            .name("order-analyze-video-final-status")
+                            .name("order-analyze-video-final-status-diagram")
                             .data(response)
             );
 
             emitter.complete();
 
+        } catch (IOException | IllegalStateException exception) {
+            emitters.remove(response.getOrderId(), emitter);
+            emitter.completeWithError(exception);
+        }
+    }
+    // when scraping is failing
+    public void sendFinalStatus(Long orderId, OrderResponse response) {
+        SseEmitter emitter = emitters.remove(orderId);
+        if (emitter == null) {
+            return;
+        }
+        try {
+            emitter.send(
+                    SseEmitter.event()
+                            .id(response.getOrderId().toString())
+                            .name("order-analyze-video-final-status")
+                            .data(response)
+            );
+            emitter.complete();
         } catch (IOException | IllegalStateException exception) {
             emitters.remove(response.getOrderId(), emitter);
             emitter.completeWithError(exception);
@@ -98,7 +117,7 @@ public class SseOrderAnalyzeVideoService {
             emitter.send(
                     SseEmitter.event()
                             .id(orderId.toString())
-                            .name("order-analyze-video-final-status")
+                            .name("order-analyze-video-order-status")
                             .data(response)
             );
         }
@@ -127,15 +146,14 @@ public class SseOrderAnalyzeVideoService {
 
         SseEmitter emitter = orderAnalyzeStatusSse(orderId);
 
-        if (order.getStatus() == OrderStatus.PURCHASED) {
+        if (order.getStatus() == OrderStatus.SUCCEED && order.getDiagramId() != null) {
             // checking if already got the message from user service
-            OrderResponse response = OrderResponse.builder()
-                    .orderId(orderId)
-                    .status(Status.SUCCEED)
-                    .message("Order Analyze Video succeeded")
+            VideoAnalyzerDiagramResponse response = VideoAnalyzerDiagramResponse.builder()
+                    .diagramId(order.getDiagramId())
+                    .message("order analyze has been completed")
                     .build();
             // sending it to the front
-            sendFinalStatus(orderId, response);
+            sendFinalStatusDiagram(response);
         }
 
         return emitter;

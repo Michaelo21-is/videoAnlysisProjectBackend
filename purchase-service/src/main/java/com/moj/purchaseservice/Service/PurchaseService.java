@@ -1,6 +1,7 @@
 package com.moj.purchaseservice.Service;
 
 import com.moj.purchaseservice.Configuration.RabbitMqConfig;
+import com.moj.purchaseservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
 import com.moj.purchaseservice.Dto.OrderCreditStatusDto;
 import com.moj.purchaseservice.Dto.OrderStatusDto;
@@ -18,7 +19,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -35,11 +38,13 @@ public class PurchaseService {
     private final OrderAnalyzeVideoRepository orderAnalyzeVideoRepository;
     private final Long costOfOrderVideoAnalyze;
     private final SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService;
+    private final FileService fileService;
     public PurchaseService(OrderAnalyzeContentsRepository orderAnalyzeContentRepository
             , RabbitTemplate rabbitTemplate, SseOrderAnalyzeContentService sseOrderAnalyzeContentService,
            OrderCreditRepository orderCreditRepository, PaddleResolvePackage paddleResolvePackage,
            SseOrderCreditService sseOrderCreditService, @Value("${video-analysis.credit-cost}") Long costOfOrderVideoAnalyze
-    , OrderAnalyzeVideoRepository orderAnalyzeVideoRepository, SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService) {
+    , OrderAnalyzeVideoRepository orderAnalyzeVideoRepository, SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService
+    , FileService fileService) {
         this.orderAnalyzeContentRepository = orderAnalyzeContentRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.sseOrderAnalyzeContentService = sseOrderAnalyzeContentService;
@@ -49,6 +54,7 @@ public class PurchaseService {
         this.costOfOrderVideoAnalyze = costOfOrderVideoAnalyze;
         this.orderAnalyzeVideoRepository = orderAnalyzeVideoRepository;
         this.sseOrderAnalyzeVideoService = sseOrderAnalyzeVideoService;
+        this.fileService = fileService;
     }
     ///
     /// order analyze content request
@@ -74,7 +80,7 @@ public class PurchaseService {
         return orderAnalyzeContents.getId();
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
-    public void orderAnalyzeContentStatus(OrderStatusDto orderStatusDto) {
+    private void orderAnalyzeContentStatus(OrderStatusDto orderStatusDto) {
         if (orderStatusDto.getStatus() == null) {
             return;
         }
@@ -171,7 +177,7 @@ public class PurchaseService {
 
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_CREDIT_STATUS_QUEUE)
-    public void orderCreditStatus(OrderCreditStatusDto orderCreditStatusDto) {
+    private void orderCreditStatus(OrderCreditStatusDto orderCreditStatusDto) {
         if (orderCreditStatusDto.getOrderCreditStatus() == null) {
             return;
         }
@@ -217,7 +223,28 @@ public class PurchaseService {
         order analyze video
      */
 
-    public Long orderAnalyzeVideo(UUID userId){
+    public Long orderAnalyzeVideo(UUID userId, OrderAnalyzeVideoDto orderAnalyzeVideoDto){
+        if (userId == null) {
+            log.error("userId is null in order analyze video check security configurations in api gateway");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"problem with server try again later");
+        }
+        boolean hasVideoFile = orderAnalyzeVideoDto.getVideoFile() != null && !orderAnalyzeVideoDto.getVideoFile().isEmpty();
+        boolean hasVideoLink = orderAnalyzeVideoDto.getVideoLink() != null && !orderAnalyzeVideoDto.getVideoLink().isEmpty();
+        if (hasVideoFile && hasVideoLink) {
+            log.error("orderAnalyzeVideoDto is null in order analyze video");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "you should provide video file or video url to analyze");
+        }
+        String video_s3_url = null;
+        if (hasVideoFile) {
+            try{
+                video_s3_url = fileService.handleVideoFile(orderAnalyzeVideoDto.getVideoFile());
+            }
+            catch (Exception e){
+                log.error("error in uploading video file to s3", e);
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+            }
+        }
+
         OrderAnalyzeVideo orderAnalyzeVideo = OrderAnalyzeVideo.builder()
                 .userId(userId)
                 .status(OrderStatus.PENDING)
@@ -227,12 +254,14 @@ public class PurchaseService {
                 .orderId(orderAnalyzeVideo.getId())
                 .userId(userId)
                 .creditCost(costOfOrderVideoAnalyze)
+                .videoLink(orderAnalyzeVideoDto.getVideoLink())
+                .videoS3Link(video_s3_url)
                 .build();
-        rabbitTemplate.convertAndSend(RabbitMqConfig.ORDER_ANALYZE_VIDEO_EXCHANGE, RabbitMqConfig.ORDER_ANALYZE_VIDEO_ROUTING_KEY, response);
+        rabbitTemplate.convertAndSend(RabbitMqConfig.ANALYZE_VIDEO_EXCHANGE, RabbitMqConfig.ORDER_ANALYZE_VIDEO_ROUTING_KEY, response);
         return orderAnalyzeVideo.getId();
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
-    public void orderAnalyzeVideoStatus(OrderStatusDto orderStatusDto) {
+    private void orderAnalyzeVideoStatus(OrderStatusDto orderStatusDto) {
         if (orderStatusDto.getStatus() == null) {
             return;
         }
@@ -264,16 +293,46 @@ public class PurchaseService {
             }
         }
     }
+
+    @RabbitListener(queues = RabbitMqConfig.SCRAPING_FINISHED_QUEUE)
+    private void getScrapingStatus(ScrapingCompleteResponse result){
+        if (result.getOrderId() == null) {
+            log.error("order id is empty in scraping finished queue");
+            return;
+        }
+        if (result.getStatus().equals(ScrapingStatus.FAILED)) {
+            OrderResponse response = OrderResponse.builder()
+                    .orderId(result.getOrderId())
+                    .status(Status.SERVER_FAILED)
+                    .message(result.getMessage())
+                    .build();
+            sseOrderAnalyzeVideoService.sendFinalStatus(result.getOrderId(), response);
+            return;
+        }
+        OrderResponse response = OrderResponse.builder()
+                .orderId(result.getOrderId())
+                .status(Status.SUCCEED)
+                .message(result.getMessage())
+                .build();
+        sseOrderAnalyzeVideoService.sendStatus(result.getOrderId(), response);
+    }
+
     @RabbitListener(queues = RabbitMqConfig.ANALYZE_VIDEO_QUEUE)
-    public void analyzeVideoResponse(VideoAnalyzerDiagramResponse videoAnalyzerDiagramResponse){
+    private void analyzeVideoResponse(VideoAnalyzerDiagramResponse videoAnalyzerDiagramResponse){
         OrderAnalyzeVideo order = orderAnalyzeVideoRepository.findById(videoAnalyzerDiagramResponse.getOrderId())
                 .orElse(null);
         if (order == null) {
-            log.error("Order id is not found in the database: \n{}", videoAnalyzerDiagramResponse.getOrderId());
+            log.error("diagram response is empty in video analyze queue");
+            return;
+        }
+        if(!videoAnalyzerDiagramResponse.getStatus().equals(OrderStatus.SUCCEED)){
+            sseOrderAnalyzeVideoService.sendFinalStatusDiagram(videoAnalyzerDiagramResponse);
+            return;
         }
         order.setStatus(OrderStatus.SUCCEED);
+        order.setDiagramId(videoAnalyzerDiagramResponse.getDiagramId());
         orderAnalyzeVideoRepository.save(order);
-        sseOrderAnalyzeVideoService.sendFinalStatus(videoAnalyzerDiagramResponse);
+        sseOrderAnalyzeVideoService.sendFinalStatusDiagram(videoAnalyzerDiagramResponse);
     }
     /*
         order analyze video

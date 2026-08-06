@@ -26,8 +26,12 @@ public class OrderAnalyzeVideo {
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
+
     @Column(name = "purchased_at")
     private Instant purchasedAt;
+
+    @Column(name = "diagram_id")
+    private String diagramId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

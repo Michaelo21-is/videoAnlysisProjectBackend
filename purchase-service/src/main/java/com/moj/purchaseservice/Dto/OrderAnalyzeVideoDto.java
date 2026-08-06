@@ -4,11 +4,12 @@ import com.moj.purchaseservice.enums.OrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
-public class OrderVideoAnalyzeDto {
-    private Long orderId;
-    private OrderStatus status;
+public class OrderAnalyzeVideoDto {
+    private MultipartFile videoFile;
+    private String videoLink;
 }

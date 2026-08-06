@@ -15,4 +15,6 @@ public class OrderAnalyzeVideoResponse {
     private UUID userId;
     private Long orderId;
     private Long creditCost;
+    private String videoUrl;
+    private String videoS3Url;
 }

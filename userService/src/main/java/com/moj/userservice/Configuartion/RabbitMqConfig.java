@@ -12,60 +12,27 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-    /*
-     * Analyze-content request:
-     * purchase-service publishes,
-     * user-service consumes.
-     */
-    public static final String ORDER_ANALYZE_CONTENT_QUEUE =
-            "order-analyze-content-queue";
 
-    /*
-     * Analyze-content result:
-     * user-service publishes,
-     * purchase-service consumes.
-     */
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE =
-            "order-analyze-content-status-exchange";
+    public static final String ORDER_ANALYZE_CONTENT_QUEUE = "order-analyze-content-queue";
+    public static final String ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE = "order-analyze-content-status-exchange";
+    public static final String ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY = "order-analyze-content-analyzeOrderStatus-routing-key";
 
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY =
-            "order-analyze-content-analyzeOrderStatus-routing-key";
+    public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
+    public static final String ORDER_CREDIT_STATUS_EXCHANGE = "order-credit-status-exchange";
+    public static final String ORDER_CREDIT_STATUS_ROUTING_KEY = "order-credit-analyzeOrderStatus-routing-key";
 
-    /*
-     * Credit purchase request:
-     * purchase-service publishes,
-     * user-service consumes.
-     */
-    public static final String ORDER_CREDIT_QUEUE =
-            "order-credit-queue";
 
-    /*
-     * Credit update result:
-     * user-service publishes.
-     *
-     * purchase-service and notification-service each have
-     * their own queue connected to this exchange.
-     */
-    public static final String ORDER_CREDIT_STATUS_EXCHANGE =
-            "order-credit-status-exchange";
-
-    public static final String ORDER_CREDIT_STATUS_ROUTING_KEY =
-            "order-credit-analyzeOrderStatus-routing-key";
-
-    /*
-    * order video analyze queue
-     */
     public static final String ORDER_ANALYZE_VIDEO_QUEUE = "order-analyze-video-queue";
 
-    /*
-        order video analyze status
-     */
-    public static final String ORDER_ANALYZE_VIDEO_STATUS_EXCHANGE = "order-analyze-video-status-exchange";
+
+    public static final String ANALYZE_VIDEO_EXCHANGE = "video-analyze-exchange";
+
     public static final String ORDER_ANALYZE_VIDEO_STATUS_ROUTING_KEY = "order-analyze-video-analyzeOrderStatus-routing-key";
     public static final String ORDER_ANALYZE_VIDEO_STATUS_QUEUE = "order-analyze-video-status-queue";
-    /*
-        order status
-     */
+
+    public static final String ANALYZE_VIDEO_ROUTING_KEY = "video-analyze-routing-key";
+    public static final String ANALYZE_VIDEO_QUEUE = "video-analyze-queue";
+
 
     @Bean
     public Queue orderAnalyzeVideoStatusQueue() {
@@ -74,13 +41,13 @@ public class RabbitMqConfig {
                 .build();
     }
     @Bean
-    public DirectExchange orderAnalyzeVideoStatusExchange() {
-        return new DirectExchange(ORDER_ANALYZE_VIDEO_STATUS_EXCHANGE);
+    public DirectExchange analyzeVideoExchange() {
+        return new DirectExchange(ANALYZE_VIDEO_EXCHANGE);
     }
     @Bean
     public Binding orderAnalyzeVideoStatusBinding(@Qualifier("orderAnalyzeVideoStatusQueue")
             Queue orderAnalyzeVideoStatusQueue,
-            @Qualifier("orderAnalyzeVideoStatusExchange")
+            @Qualifier("analyzeVideoExchange")
             DirectExchange orderAnalyzeVideoStatusExchange
     ) {
         return BindingBuilder
@@ -111,6 +78,20 @@ public class RabbitMqConfig {
         return QueueBuilder
                 .durable(ORDER_CREDIT_QUEUE)
                 .build();
+    }
+    @Bean
+    public Queue videoAnalyzeQueue() {
+        return QueueBuilder
+                .durable(ANALYZE_VIDEO_QUEUE)
+                .build();
+    }
+    @Bean
+    public Binding videoAnalyzeBinding(@Qualifier("videoAnalyzeQueue") Queue videoAnalyzeQueue
+            , @Qualifier("analyzeVideoExchange") DirectExchange analyzeVideoExchange) {
+        return BindingBuilder
+                .bind(videoAnalyzeQueue)
+                .to(analyzeVideoExchange)
+                .with(ANALYZE_VIDEO_ROUTING_KEY);
     }
 
     @Bean
