@@ -1,7 +1,6 @@
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.Schemea.DiagramSchema import DiagramResponse
-from fastapi import UploadFile, File
 
 class AnalyzeVideoStatus(str, Enum):
     PENDING = "PENDING"
@@ -20,9 +19,15 @@ class ScrapingCompletedResponse(BaseModel):
     status: ScrapingStatus
 
 class AnalyzeVideoSchema(BaseModel):
-    order_id: int
-    video_url: str | None = None
-    file:
+    order_id: int = Field(alias="orderId")
+    video_url: str | None = Field(
+        default=None,
+        alias="videoUrl",
+    )
+    video_s3_url: str | None = Field(
+        default=None,
+        alias="videoS3Url",
+    )
 
 class AnalyzeVideoResponse(BaseModel):
     diagram: DiagramResponse | None = None

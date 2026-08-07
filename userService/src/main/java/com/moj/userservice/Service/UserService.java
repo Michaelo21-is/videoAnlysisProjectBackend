@@ -8,6 +8,7 @@ import com.moj.userservice.Entity.Users;
 import com.moj.userservice.Enums.AnalyzeOrderStatus;
 import com.moj.userservice.Enums.OrderCreditStatus;
 import com.moj.userservice.Repository.UserRepository;
+import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
 import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
 import com.moj.userservice.Response.UserDetailsResponse;
 import com.moj.userservice.Utils.SendToQueue;
@@ -169,7 +170,12 @@ public class UserService {
                 .orderId(orderAnalyzeVideoDto.getOrderId())
                 .build();
         sendToQueue.sendOrderAnalyzeStatus(response);
-        sendToQueue.sendOrderToAnalyzeVideo(orderAnalyzeVideoDto);
+        OrderAnalyzeVideoResponse orderAnalyzeVideoResponse = OrderAnalyzeVideoResponse.builder()
+                .videoS3Url(orderAnalyzeVideoDto.getVideoS3Url())
+                .videoS3Url(orderAnalyzeVideoDto.getVideoUrl())
+                .orderId(orderAnalyzeVideoDto.getOrderId())
+                .build();
+        sendToQueue.sendOrderToAnalyzeVideo(orderAnalyzeVideoResponse);
     }
     /// ***
     /// purchase area

@@ -5,6 +5,7 @@ import com.moj.userservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.userservice.Dto.OrderCreditDto;
 import com.moj.userservice.Enums.AnalyzeOrderStatus;
 import com.moj.userservice.Enums.OrderCreditStatus;
+import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
 import com.moj.userservice.Response.OrderCreditResponse;
 import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
 import com.moj.userservice.Response.PurchaseWithCreditResponse;
@@ -51,7 +52,7 @@ public class SendToQueue {
                 response
         );
     }
-    public void sendOrderToAnalyzeVideo(OrderAnalyzeVideoDto response){
+    public void sendOrderToAnalyzeVideo(OrderAnalyzeVideoResponse response){
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.ANALYZE_VIDEO_EXCHANGE,
                 RabbitMqConfig.ANALYZE_VIDEO_ROUTING_KEY,

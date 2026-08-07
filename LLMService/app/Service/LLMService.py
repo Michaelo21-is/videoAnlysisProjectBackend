@@ -1,10 +1,9 @@
 from uuid import UUID
 from app.Config.ApifyConfig import get_tiktok_video_with_url, get_instagram_video_with_url, get_facebook_video_with_url, get_x_video_with_url
 from app.Config.RabitMqConfig import rabbitmq_manager
-from app.Routers.LLMRouter import create_diagram
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, ScrapingCompletedResponse
 from app.Schemea.DiagramSchema import DiagramResponse
-from app.Config.GeminiConfig import analyze_video_url, analyze_video_file
+from app.Config.GeminiConfig import analyze_video_url
 from app.Util.CheckUrlPlatform import check_url_platform, Platform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
 from app.Service.DiagramService import DiagramService
@@ -133,33 +132,7 @@ class LLMService:
                 exchange= "video-analysis-exchange",
                 routing_key= "analyze_video_routing_key",
             )
-        elif analyze_video_schema.video_mp4 is not None:
-            if analyze_video_schema.video_mp4.filename.endswith(".mp4") is not True:
-                logger.exception("Video MP4 is not a valid MP4 file")
-                scraping_response = ScrapingCompletedResponse(
-                    order_id=analyze_video_schema.order_id,
-                    status=ScrapingCompletedResponse.Status.FAILED,
-                    message="Video MP4 is not a valid MP4 file",
-                )
-                rabbitmq_manager.publish_message(
-                    message= scraping_response,
-                    exchange= "video-analysis-exchange",
-                    routing_key= "scraping_finished_routing_key",
-                )
-                return
-            if analyze_video_schema.video_mp4.file.size > 100 * 1024 * 1024:
-                logger.exception("Video MP4 is too large")
-                scraping_response = ScrapingCompletedResponse(
-                    order_id=analyze_video_schema.order_id,
-                    status=ScrapingCompletedResponse.Status.FAILED,
-                    message="Video MP4 is too large",
-                )
-                rabbitmq_manager.publish_message(
-                    message= scraping_response,
-                    exchange= "video-analysis-exchange",
-                    routing_key= "scraping_finished_routing_key",
-                )
-                return
+
             scraping_response = ScrapingCompletedResponse(
                 order_id=analyze_video_schema.order_id,
                 status=ScrapingCompletedResponse.status.SUCCEED,
@@ -171,8 +144,8 @@ class LLMService:
                 routing_key= "scraping_finished_routing_key",
             )
             prompt = build_video_file_analysis_prompt()
-            diagram_create = await asyncio.to_thread(analyze_video_file, analyze_video_schema.video_mp4.file, prompt,)
-            diagram_id = await asyncio.to_thread(DiagramService.create_diagram, create_diagram, user_id,)
+            diagram_create = await asyncio.to_thread(analyze_video_url, analyze_video_schema.videoS3Url, prompt, )
+            diagram_id = await asyncio.to_thread(DiagramService.create_diagram, diagram_create, user_id,)
             diagram_response = DiagramResponse(
                 name=diagram_create.name,
                 private=True,

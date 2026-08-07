@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.Routers.LLMRouter import router as llm_router
+from app.Service.LLMService import LLMService
 import logging
 from app.Config.RabitMqConfig import rabbitmq_manager
 
 @asynccontextmanager
 async def lifespan():
     await rabbitmq_manager.connect()
-
+    await rabbitmq_manager.consume_analyze_video(LLMService.analyze_video,)
     try:
         yield
     finally:
