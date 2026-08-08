@@ -12,6 +12,8 @@ import asyncio
 logger = logging.getLogger(__name__)
 
 class LLMService:
+    def __init__(self):
+        self.diagram_service = DiagramService()
     async def analyze_video( self, analyze_video_schema: AnalyzeVideoSchema) -> None:
         logger.info(f"Received analyze video request: {analyze_video_schema}")
         # 1. לא התקבל שום מקור וידאו
@@ -155,7 +157,7 @@ class LLMService:
                 return
 
             diagram_id = await asyncio.to_thread(
-                DiagramService.create_diagram,
+                self.diagram_service.create_diagram,
                 diagram_create,
                 analyze_video_schema.user_id,
             )
@@ -207,7 +209,7 @@ class LLMService:
                 return
 
             diagram_id = await asyncio.to_thread(
-                DiagramService.create_diagram,
+                self.diagram_service.create_diagram,
                 diagram_create,
                 analyze_video_schema.user_id,
             )

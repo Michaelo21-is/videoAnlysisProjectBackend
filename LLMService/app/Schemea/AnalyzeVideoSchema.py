@@ -34,7 +34,7 @@ class AnalyzeVideoResponse(BaseModel):
     order_id: int
     message: str
     status: AnalyzeVideoStatus
-    video_gemini_url: str | None
+    video_gemini_url: str | None = None
 class ScrapingCompletedResponse(BaseModel):
     order_id: int
     message: str

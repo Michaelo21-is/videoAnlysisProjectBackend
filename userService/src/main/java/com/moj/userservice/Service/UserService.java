@@ -173,7 +173,7 @@ public class UserService {
                 .build();
         sendToQueue.sendOrderAnalyzeStatus(response);
         OrderAnalyzeVideoResponse orderAnalyzeVideoResponse = OrderAnalyzeVideoResponse.builder()
-                .videoS3Url(orderAnalyzeVideoDto.getVideoGeminiUrl())
+                .videoGeminiUrl(orderAnalyzeVideoDto.getVideoGeminiUrl())
                 .videoUrl(orderAnalyzeVideoDto.getVideoUrl())
                 .orderId(orderAnalyzeVideoDto.getOrderId())
                 .userId(orderAnalyzeVideoDto.getUserId())
