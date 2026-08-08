@@ -68,7 +68,7 @@ def get_x_video_with_url(url: str) -> dict[str, Any]:
     raise ValueError("No Twitter video was found")
 def get_facebook_video_with_url(url: str) -> dict[str, Any]:
     run_input = {
-        "url": "https://www.facebook.com/watch/?v=123456789",
+        "url": url,
         "urls": None,
         "proxyConfiguration": {
             "useApifyProxy": True,

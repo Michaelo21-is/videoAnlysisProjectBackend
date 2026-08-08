@@ -1,9 +1,8 @@
-from uuid import UUID
 from app.Config.ApifyConfig import get_tiktok_video_with_url, get_instagram_video_with_url, get_facebook_video_with_url, get_x_video_with_url
 from app.Config.RabitMqConfig import rabbitmq_manager
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
-from app.Config.GeminiConfig import analyze_video_url
+from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini
 from app.Util.CheckUrlPlatform import check_url_platform, Platform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
 from app.Service.DiagramService import DiagramService
@@ -123,17 +122,23 @@ class LLMService:
                 video_details["platform"],
                 video_details["name"],
             )
-
+            gemini_url = video_details["urls"][0]
             try:
+                if video_details["platform"] != Platform.YOUTUBE:
+                    gemini_url = await asyncio.to_thread(
+                        upload_video_url_to_gemini,
+                        gemini_url,
+                    )
+
                 diagram_create = await asyncio.to_thread(
                     analyze_video_url,
-                    video_details["urls"][0],
+                    gemini_url,
                     prompt,
                 )
 
             except Exception as e:
                 logger.exception(
-                    f"Failed to analyze video: {e}"
+                    f"Failed to upload/analyze video: {e}"
                 )
 
                 response = AnalyzeVideoResponse(
@@ -161,6 +166,7 @@ class LLMService:
                 message="Video analyzed successfully",
                 order_id=analyze_video_schema.order_id,
                 diagram_id=diagram_id,
+                video_gemini_url=gemini_url,
             )
 
             rabbitmq_manager.publish_message(
