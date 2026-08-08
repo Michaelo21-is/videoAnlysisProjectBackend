@@ -14,5 +14,5 @@ public class OrderAnalyzeVideoDto {
     private Long creditCost;
     private UUID userId;
     private String videoUrl;
-    private String videoS3Url;
+    private String videoGeminiUrl;
 }

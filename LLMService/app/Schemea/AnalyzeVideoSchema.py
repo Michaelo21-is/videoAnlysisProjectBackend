@@ -1,7 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel, Field
-from app.Schemea.DiagramSchema import DiagramResponse
-
+from uuid import UUID
 class AnalyzeVideoStatus(str, Enum):
     PENDING = "PENDING"
     FAILED_TO_DOWNLOAD_VIDEO = "FAILED_TO_DOWNLOAD_VIDEO"
@@ -20,21 +19,22 @@ class ScrapingCompletedResponse(BaseModel):
 
 class AnalyzeVideoSchema(BaseModel):
     order_id: int = Field(alias="orderId")
+    user_id: UUID = Field(alias="userId")
     video_url: str | None = Field(
         default=None,
         alias="videoUrl",
     )
-    video_s3_url: str | None = Field(
+    video_gemini_url: str | None = Field(
         default=None,
-        alias="videoS3Url",
+        alias="videoGeminiUrl",
     )
 
 class AnalyzeVideoResponse(BaseModel):
-    diagram: DiagramResponse | None = None
     diagram_id: str | None = None
     order_id: int
     message: str
     status: AnalyzeVideoStatus
+    video_gemini_url: str | None
 class ScrapingCompletedResponse(BaseModel):
     order_id: int
     message: str

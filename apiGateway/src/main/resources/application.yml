@@ -22,6 +22,10 @@ spring:
               uri: ${PURCHASE_SERVICE_URL}
               predicates:
                 - Path=/api/purchase/**
+              filters:
+                - name: RequestSize
+                  args:
+                    maxSize: 2GB
             - id: llm-service-route
               uri: ${LLM_SERVICE_URL}
               predicates:

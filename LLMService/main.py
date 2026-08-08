@@ -5,10 +5,18 @@ from app.Service.LLMService import LLMService
 import logging
 from app.Config.RabitMqConfig import rabbitmq_manager
 
+
+llm_service = LLMService()
+
+
 @asynccontextmanager
-async def lifespan():
+async def lifespan(_app: FastAPI):
     await rabbitmq_manager.connect()
-    await rabbitmq_manager.consume_analyze_video(LLMService.analyze_video,)
+
+    await rabbitmq_manager.consume_analyze_video(
+        llm_service.analyze_video
+    )
+
     try:
         yield
     finally:
@@ -19,6 +27,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
+
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(llm_router)

@@ -1,9 +1,11 @@
 package com.moj.purchaseservice.Controller;
 
+import com.moj.purchaseservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
 import com.moj.purchaseservice.Service.*;
 import com.moj.purchaseservice.enums.ContentType;
 import com.moj.purchaseservice.enums.SumOfContent;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +15,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/purchase")
+@Slf4j
 public class PurchaseController {
     private final PurchaseService purchaseService;
     private final SseOrderAnalyzeContentService sseOrderAnalyzeContentService;
@@ -58,8 +61,9 @@ public class PurchaseController {
         return sseOrderAnalyzeContentService.OrderAnalyzeStatusSSE(orderId, userId);
     }
     @PostMapping("/order-analyze-video")
-    public ResponseEntity<?> analyzeVideo(@RequestHeader("X-USER-ID") UUID userId) {
-        Long orderId = purchaseService.orderAnalyzeVideo(userId);
+    public ResponseEntity<?> analyzeVideo(@RequestHeader("X-USER-ID") UUID userId, @ModelAttribute OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
+        log.info("get analyze video request with userId: {}", userId);
+        Long orderId = purchaseService.orderAnalyzeVideo(userId, orderAnalyzeVideoDto);
         return ResponseEntity.accepted().body(orderId);
     }
     @GetMapping(value = "/order-analyze-video/status/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

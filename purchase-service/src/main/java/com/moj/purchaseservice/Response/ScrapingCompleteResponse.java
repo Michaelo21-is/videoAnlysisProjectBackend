@@ -14,4 +14,5 @@ public class ScrapingCompleteResponse {
     private Long orderId;
     private String message;
     private ScrapingStatus status;
+
 }

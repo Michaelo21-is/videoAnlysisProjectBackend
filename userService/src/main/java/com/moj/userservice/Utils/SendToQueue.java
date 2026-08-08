@@ -48,7 +48,7 @@ public class SendToQueue {
     public void sendOrderAnalyzeStatus(OrderVideoAnalysisStatusResponse response){
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.ANALYZE_VIDEO_EXCHANGE,
-                RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY,
+                RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_ROUTING_KEY,
                 response
         );
     }

@@ -1,5 +1,7 @@
 package com.moj.purchaseservice.Service;
 
+import com.google.genai.Client;
+import com.google.genai.types.UploadFileConfig;
 import org.apache.tika.Tika;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -7,16 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import java.io.IOException;
-import java.time.Duration;
-import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 @Service
 public class FileService {
@@ -24,27 +20,22 @@ public class FileService {
     private final DataSize maxVideoSize;
     private final Tika tika;
     private final String mp4ContentType;
-    private final S3Client s3Client;
-    private final S3Presigner s3Presigner;
-    private final String bucketName;
+    private final Client geminiClient;
 
     public FileService(
             @Value("${max-video.size}") DataSize maxVideoSize,
             @Value("${mp4.content-type}") String mp4ContentType,
             Tika tika,
-            S3Client s3Client,
-            S3Presigner s3Presigner,
-            @Value("${aws.s3.bucket-name}") String bucketName
+            Client geminiClient
     ) {
         this.maxVideoSize = maxVideoSize;
         this.mp4ContentType = mp4ContentType;
         this.tika = tika;
-        this.s3Client = s3Client;
-        this.s3Presigner = s3Presigner;
-        this.bucketName = bucketName;
+        this.geminiClient = geminiClient;
     }
 
     public String handleVideoFile(MultipartFile videoFile) {
+
         if (videoFile == null || videoFile.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -55,9 +46,11 @@ public class FileService {
         if (videoFile.getSize() > maxVideoSize.toBytes()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "The video file must be smaller than 100 MB."
+                    "The video file is too large."
             );
         }
+
+        Path tempFile = null;
 
         try {
             String detectedContentType =
@@ -70,52 +63,60 @@ public class FileService {
                 );
             }
 
-            String objectKey =
-                    "videos/" + UUID.randomUUID() + ".mp4";
-
-            PutObjectRequest putObjectRequest =
-                    PutObjectRequest.builder()
-                            .bucket(bucketName)
-                            .key(objectKey)
-                            .contentType(mp4ContentType)
-                            .contentLength(videoFile.getSize())
-                            .build();
-
-            s3Client.putObject(
-                    putObjectRequest,
-                    RequestBody.fromInputStream(
-                            videoFile.getInputStream(),
-                            videoFile.getSize()
-                    )
+            tempFile = Files.createTempFile(
+                    "gemini-video-",
+                    ".mp4"
             );
 
-            return getPresignedGetUrl(objectKey);
+            videoFile.transferTo(tempFile);
+
+            com.google.genai.types.File uploadedFile =
+                    geminiClient.files.upload(
+                            tempFile.toString(),
+                            UploadFileConfig.builder()
+                                    .mimeType(detectedContentType)
+                                    .build()
+                    );
+
+            return uploadedFile.uri()
+                    .orElseThrow(() ->
+                            new IllegalStateException(
+                                    "Gemini did not return a file name"
+                            )
+                    );
 
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Failed to read the uploaded video file.",
+                    "Failed to process the uploaded video.",
                     e
             );
+
+        }
+        finally {
+            if (tempFile != null){
+                try{
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
     }
+    public void deleteFileFromGemini(String videoGeminiLink){
+        int fileIndex = videoGeminiLink.indexOf("files/");
 
-    private String getPresignedGetUrl(String objectKey) {
-        GetObjectRequest getObjectRequest =
-                GetObjectRequest.builder()
-                        .bucket(bucketName)
-                        .key(objectKey)
-                        .build();
+        if (fileIndex == -1) {
+            throw new IllegalArgumentException(
+                    "Invalid Gemini file URI"
+            );
+        }
 
-        GetObjectPresignRequest presignRequest =
-                GetObjectPresignRequest.builder()
-                        .signatureDuration(Duration.ofHours(1))
-                        .getObjectRequest(getObjectRequest)
-                        .build();
+        String fileName = videoGeminiLink.substring(fileIndex);
 
-        return s3Presigner
-                .presignGetObject(presignRequest)
-                .url()
-                .toExternalForm();
+        geminiClient.files.delete(
+                fileName,
+                null
+        );
     }
 }

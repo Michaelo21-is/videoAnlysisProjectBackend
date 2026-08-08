@@ -29,8 +29,8 @@ RABBITMQ_URL = (
 
 VIDEO_ANALYSIS_EXCHANGE = "video-analyze-exchange"
 
-ANALYZE_VIDEO_QUEUE = "analyze-video-queue"
-ANALYZE_VIDEO_ROUTING_KEY = "analyze_video_request_routing_key"
+ANALYZE_VIDEO_QUEUE = "video-analyze-queue"
+ANALYZE_VIDEO_ROUTING_KEY = "video-analyze-routing-key"
 
 ANALYZE_VIDEO_RESPONSE_QUEUE = "analyze-video-response-queue"
 ANALYZE_VIDEO_RESPONSE_ROUTING_KEY = (

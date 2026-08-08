@@ -1,10 +1,7 @@
 package com.moj.purchaseservice.Service;
 
 import com.moj.purchaseservice.Configuration.RabbitMqConfig;
-import com.moj.purchaseservice.Dto.OrderAnalyzeVideoDto;
-import com.moj.purchaseservice.Dto.OrderCreditDto;
-import com.moj.purchaseservice.Dto.OrderCreditStatusDto;
-import com.moj.purchaseservice.Dto.OrderStatusDto;
+import com.moj.purchaseservice.Dto.*;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Entity.OrderAnalyzeVideo;
 import com.moj.purchaseservice.Entity.OrderCredit;
@@ -80,7 +77,7 @@ public class PurchaseService {
         return orderAnalyzeContents.getId();
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
-    private void orderAnalyzeContentStatus(OrderStatusDto orderStatusDto) {
+    private void orderAnalyzeContentStatus(OrderAnalyzeVideoStatusDto orderStatusDto) {
         if (orderStatusDto.getStatus() == null) {
             return;
         }
@@ -90,7 +87,7 @@ public class PurchaseService {
         OrderResponse response;
 
         switch (orderStatusDto.getStatus()) {
-            case SUCCEED -> {
+            case PURCHASED -> {
                 order.setStatus(OrderAnalyzeVideoStatus.PURCHASED);
                 order.setPurchasedAt(Instant.now());
                 orderAnalyzeContentRepository.save(order);
@@ -224,16 +221,22 @@ public class PurchaseService {
      */
 
     public Long orderAnalyzeVideo(UUID userId, OrderAnalyzeVideoDto orderAnalyzeVideoDto){
+        log.info("order analyze video request received");
         if (userId == null) {
             log.error("userId is null in order analyze video check security configurations in api gateway");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"problem with server try again later");
         }
         boolean hasVideoFile = orderAnalyzeVideoDto.getVideoFile() != null && !orderAnalyzeVideoDto.getVideoFile().isEmpty();
         boolean hasVideoLink = orderAnalyzeVideoDto.getVideoLink() != null && !orderAnalyzeVideoDto.getVideoLink().isEmpty();
-        if (hasVideoFile && hasVideoLink) {
+        if (!hasVideoFile && !hasVideoLink) {
             log.error("orderAnalyzeVideoDto is null in order analyze video");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "you should provide video file or video url to analyze");
         }
+        if (hasVideoFile && hasVideoLink) {
+            log.error("orderAnalyzeVideoDto has both video file and video link");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "you should provide video file or video url to analyze");
+        }
+
         String video_s3_url = null;
         if (hasVideoFile) {
             try{
@@ -254,21 +257,23 @@ public class PurchaseService {
                 .orderId(orderAnalyzeVideo.getId())
                 .userId(userId)
                 .creditCost(costOfOrderVideoAnalyze)
-                .videoLink(orderAnalyzeVideoDto.getVideoLink())
-                .videoS3Link(video_s3_url)
+                .videoUrl(orderAnalyzeVideoDto.getVideoLink())
+                .videoGeminiUrl(video_s3_url)
                 .build();
+        log.info("order send to rabbitmq for video analyze to user service");
         rabbitTemplate.convertAndSend(RabbitMqConfig.ANALYZE_VIDEO_EXCHANGE, RabbitMqConfig.ORDER_ANALYZE_VIDEO_ROUTING_KEY, response);
         return orderAnalyzeVideo.getId();
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
-    private void orderAnalyzeVideoStatus(OrderStatusDto orderStatusDto) {
+    private void orderAnalyzeVideoStatus(OrderAnalyzeVideoStatusDto orderStatusDto) {
+        log.info("order analyze video status received");
         if (orderStatusDto.getStatus() == null) {
             return;
         }
         OrderAnalyzeVideo order = orderAnalyzeVideoRepository.findById(orderStatusDto.getOrderId())
                 .orElseThrow(() -> new RuntimeException("Order not found"));
         switch (orderStatusDto.getStatus()) {
-            case SUCCEED -> {
+            case PURCHASED -> {
                 order.setStatus(OrderStatus.PURCHASED);
                 orderAnalyzeVideoRepository.save(order);
                 sseOrderAnalyzeVideoService.sendStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
@@ -333,6 +338,9 @@ public class PurchaseService {
         order.setDiagramId(videoAnalyzerDiagramResponse.getDiagramId());
         orderAnalyzeVideoRepository.save(order);
         sseOrderAnalyzeVideoService.sendFinalStatusDiagram(videoAnalyzerDiagramResponse);
+        if (videoAnalyzerDiagramResponse.getVideoGeminiUrl() != null && !videoAnalyzerDiagramResponse.getVideoGeminiUrl().isBlank()) {
+            fileService.deleteFileFromGemini(videoAnalyzerDiagramResponse.getVideoGeminiUrl());
+        }
     }
     /*
         order analyze video

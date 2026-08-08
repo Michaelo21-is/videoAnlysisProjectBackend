@@ -198,7 +198,7 @@ def build_video_file_analysis_prompt() -> str:
         """
         You are an expert short-form and long-form video analyst.
 
-        The user uploaded an MP4 video file.
+        The user uploaded an MP4 video video.
 
         Analyze the entire uploaded video and convert its structure into a
         diagram that matches the DiagramCreate JSON schema described below.

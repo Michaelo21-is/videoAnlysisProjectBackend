@@ -16,5 +16,5 @@ public class OrderAnalyzeVideoResponse {
     private Long orderId;
     private Long creditCost;
     private String videoUrl;
-    private String videoS3Url;
+    private String videoGeminiUrl;
 }

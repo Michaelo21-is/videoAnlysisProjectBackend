@@ -129,6 +129,7 @@ public class UserService {
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_QUEUE)
     public void handleOrderAnalyzeVideo(OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
+        log.info("reccived order deatils, info: {}", orderAnalyzeVideoDto);
         if (orderAnalyzeVideoDto.getUserId() == null || orderAnalyzeVideoDto.getCreditCost() == null || orderAnalyzeVideoDto.getOrderId() == null) {
             log.info("some of the parameters are null: {}", orderAnalyzeVideoDto);
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
@@ -164,6 +165,7 @@ public class UserService {
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
         }
+        user.setCreditSum(updatedCreditSum);
         userRepository.save(user);
         OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
                 .status(OrderCreditStatus.PURCHASED)
@@ -171,9 +173,10 @@ public class UserService {
                 .build();
         sendToQueue.sendOrderAnalyzeStatus(response);
         OrderAnalyzeVideoResponse orderAnalyzeVideoResponse = OrderAnalyzeVideoResponse.builder()
-                .videoS3Url(orderAnalyzeVideoDto.getVideoS3Url())
-                .videoS3Url(orderAnalyzeVideoDto.getVideoUrl())
+                .videoS3Url(orderAnalyzeVideoDto.getVideoGeminiUrl())
+                .videoUrl(orderAnalyzeVideoDto.getVideoUrl())
                 .orderId(orderAnalyzeVideoDto.getOrderId())
+                .userId(orderAnalyzeVideoDto.getUserId())
                 .build();
         sendToQueue.sendOrderToAnalyzeVideo(orderAnalyzeVideoResponse);
     }
