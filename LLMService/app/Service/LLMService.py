@@ -1,5 +1,5 @@
 from app.Config.ApifyConfig import get_tiktok_video_with_url, get_instagram_video_with_url, get_facebook_video_with_url, get_x_video_with_url
-from app.Config.RabitMqConfig import rabbitmq_manager
+from app.Config.RabitMqConfig import rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_ROUTING_KEY, SCRAPING_FINISHED_ROUTING_KEY
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
 from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini
@@ -27,10 +27,9 @@ class LLMService:
                 order_id=analyze_video_schema.order_id,
             )
 
-            rabbitmq_manager.publish_message(
-                message=response,
-                exchange="video-analysis-exchange",
-                routing_key="analyze_video_routing_key",
+            await rabbitmq_manager.publish(
+                payload=response,
+                routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
             )
             return
 
@@ -47,10 +46,9 @@ class LLMService:
                     order_id=analyze_video_schema.order_id,
                 )
 
-                rabbitmq_manager.publish_message(
-                    message=response,
-                    exchange="video-analysis-exchange",
-                    routing_key="analyze_video_routing_key",
+                await rabbitmq_manager.publish(
+                    payload=response,
+                    routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
                 )
                 return
 
@@ -100,10 +98,9 @@ class LLMService:
                     message="Failed to scrape video",
                 )
 
-                rabbitmq_manager.publish_message(
-                    message=scraping_response,
-                    exchange="video-analysis-exchange",
-                    routing_key="scraping_finished_routing_key",
+                await rabbitmq_manager.publish(
+                    payload=scraping_response,
+                    routing_key=SCRAPING_FINISHED_ROUTING_KEY,
                 )
                 return
 
@@ -114,10 +111,9 @@ class LLMService:
                 message="Video scraping completed",
             )
 
-            rabbitmq_manager.publish_message(
-                message=scraping_response,
-                exchange="video-analysis-exchange",
-                routing_key="scraping_finished_routing_key",
+            await rabbitmq_manager.publish(
+                payload=scraping_response,
+                routing_key=SCRAPING_FINISHED_ROUTING_KEY,
             )
 
             prompt = build_video_url_analysis_prompt(
@@ -149,10 +145,9 @@ class LLMService:
                     order_id=analyze_video_schema.order_id,
                 )
 
-                rabbitmq_manager.publish_message(
-                    message=response,
-                    exchange="video-analysis-exchange",
-                    routing_key="analyze_video_routing_key",
+                await rabbitmq_manager.publish(
+                    payload=response,
+                    routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
                 )
                 return
 
@@ -171,10 +166,9 @@ class LLMService:
                 video_gemini_url=gemini_url,
             )
 
-            rabbitmq_manager.publish_message(
-                message=response,
-                exchange="video-analysis-exchange",
-                routing_key="analyze_video_routing_key",
+            await rabbitmq_manager.publish(
+                payload=response,
+                routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
             )
 
             return
@@ -201,10 +195,9 @@ class LLMService:
                     order_id=analyze_video_schema.order_id,
                 )
 
-                rabbitmq_manager.publish_message(
-                    message=response,
-                    exchange="video-analysis-exchange",
-                    routing_key="analyze_video_routing_key",
+                await rabbitmq_manager.publish(
+                    payload=response,
+                    routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
                 )
                 return
 
@@ -223,10 +216,9 @@ class LLMService:
                 video_gemini_url=analyze_video_schema.video_gemini_url,
             )
 
-            rabbitmq_manager.publish_message(
-                message=response,
-                exchange="video-analysis-exchange",
-                routing_key="analyze_video_routing_key",
+            await rabbitmq_manager.publish(
+                payload=response,
+                routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
             )
 
             return

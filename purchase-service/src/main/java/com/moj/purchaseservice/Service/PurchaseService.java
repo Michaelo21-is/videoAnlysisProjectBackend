@@ -18,6 +18,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -263,6 +264,36 @@ public class PurchaseService {
         log.info("order send to rabbitmq for video analyze to user service");
         rabbitTemplate.convertAndSend(RabbitMqConfig.ANALYZE_VIDEO_EXCHANGE, RabbitMqConfig.ORDER_ANALYZE_VIDEO_ROUTING_KEY, response);
         return orderAnalyzeVideo.getId();
+    }
+    public String checkOrderAnalyzeVideoId(UUID userId, Long orderId) {
+        OrderAnalyzeVideo order = orderAnalyzeVideoRepository.findById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Order not found"
+                ));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You are not authorized to access this order"
+            );
+        }
+
+        return switch (order.getStatus()) {
+            case SUCCEED -> order.getDiagramId();
+
+
+            case PAYMENT_FAILED -> throw new ResponseStatusException(
+                    HttpStatus.PAYMENT_REQUIRED,
+                    "You don't have enough credits to analyze the video"
+            );
+
+            case SERVER_FAILED -> throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Something went wrong while analyzing the video. Please check the link or file and try again."
+            );
+            default -> null;
+        };
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
     private void orderAnalyzeVideoStatus(OrderAnalyzeVideoStatusDto orderStatusDto) {

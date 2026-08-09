@@ -15,7 +15,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/purchase")
-@Slf4j
 public class PurchaseController {
     private final PurchaseService purchaseService;
     private final SseOrderAnalyzeContentService sseOrderAnalyzeContentService;
@@ -62,9 +61,13 @@ public class PurchaseController {
     }
     @PostMapping("/order-analyze-video")
     public ResponseEntity<?> analyzeVideo(@RequestHeader("X-USER-ID") UUID userId, @ModelAttribute OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
-        log.info("get analyze video request with userId: {}", userId);
         Long orderId = purchaseService.orderAnalyzeVideo(userId, orderAnalyzeVideoDto);
         return ResponseEntity.accepted().body(orderId);
+    }
+    @GetMapping("/check-order-analyze-video-id")
+    public ResponseEntity<?> checkOrderId(@RequestParam("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
+        String diagramId = purchaseService.checkOrderAnalyzeVideoId(userId, orderId);
+        return ResponseEntity.ok(diagramId);
     }
     @GetMapping(value = "/order-analyze-video/status/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter getAnalyzeVideoStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
