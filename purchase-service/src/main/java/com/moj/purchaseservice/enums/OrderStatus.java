@@ -6,5 +6,6 @@ public enum OrderStatus {
     SERVER_FAILED,
     FAILED_TO_ADD_CREDIT,
     PURCHASED,
+    SCRAPING_COMPLETED,
     SUCCEED,
 }

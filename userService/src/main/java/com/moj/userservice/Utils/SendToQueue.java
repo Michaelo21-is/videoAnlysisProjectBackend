@@ -1,10 +1,9 @@
 package com.moj.userservice.Utils;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
-import com.moj.userservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.userservice.Dto.OrderCreditDto;
 import com.moj.userservice.Enums.AnalyzeOrderStatus;
-import com.moj.userservice.Enums.OrderCreditStatus;
+import com.moj.userservice.Enums.OrderStatus;
 import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
 import com.moj.userservice.Response.OrderCreditResponse;
 import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
@@ -31,14 +30,14 @@ public class SendToQueue {
                 response
         );
     }
-    public void sendOrderCreditStatus(OrderCreditDto orderCreditDto, OrderCreditStatus  orderCreditStatus) {
+    public void sendOrderCreditStatus(OrderCreditDto orderCreditDto, OrderStatus orderStatus) {
         OrderCreditResponse response = OrderCreditResponse.builder()
                 .orderId(orderCreditDto.getOrderId())
                 .creditAdded(orderCreditDto.getCredit())
                 .priceInUsd(orderCreditDto.getPriceInUsd())
                 .email(orderCreditDto.getEmail())
                 .fullName(orderCreditDto.getFullName())
-                .orderCreditStatus(orderCreditStatus)
+                .orderStatus(orderStatus)
                 .build();
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.ORDER_CREDIT_STATUS_EXCHANGE,

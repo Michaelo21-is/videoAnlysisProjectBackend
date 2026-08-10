@@ -6,7 +6,7 @@ import com.moj.userservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.userservice.Dto.OrderCreditDto;
 import com.moj.userservice.Entity.Users;
 import com.moj.userservice.Enums.AnalyzeOrderStatus;
-import com.moj.userservice.Enums.OrderCreditStatus;
+import com.moj.userservice.Enums.OrderStatus;
 import com.moj.userservice.Repository.UserRepository;
 import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
 import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
@@ -106,26 +106,26 @@ public class UserService {
     @Transactional
     public void handleOrderCredit(OrderCreditDto orderCreditDto) {
         if (orderCreditDto.getCredit() == null || orderCreditDto.getPriceInUsd() == null || orderCreditDto.getUserId() == null) {
-            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SERVER_FAILED);
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderStatus.SERVER_FAILED);
             return;
         }
         Users user = userRepository.findById(orderCreditDto.getUserId())
                 .orElse(null);
         if (user == null) {
             log.info("User not found");
-            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.SERVER_FAILED);
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderStatus.SERVER_FAILED);
             return;
         }
         int updateRow = userRepository.addCredit(orderCreditDto.getUserId(), orderCreditDto.getCredit());
         if (updateRow == 0) {
             log.info("Failed to add credit");
-            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderCreditStatus.FAILED_TO_ADD_CREDIT);
+            sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderStatus.FAILED_TO_ADD_CREDIT);
             return;
         }
         orderCreditDto.setEmail(user.getEmail());
         orderCreditDto.setFullName(user.getFullName());
         log.info("Credit added");
-        sendToQueue.sendOrderCreditStatus(orderCreditDto, OrderCreditStatus.SUCCEED);
+        sendToQueue.sendOrderCreditStatus(orderCreditDto, OrderStatus.SUCCEED);
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_QUEUE)
     public void handleOrderAnalyzeVideo(OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
@@ -133,7 +133,7 @@ public class UserService {
         if (orderAnalyzeVideoDto.getUserId() == null || orderAnalyzeVideoDto.getCreditCost() == null || orderAnalyzeVideoDto.getOrderId() == null) {
             log.info("some of the parameters are null: {}", orderAnalyzeVideoDto);
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderCreditStatus.SERVER_FAILED)
+                    .status(OrderStatus.SERVER_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -143,7 +143,7 @@ public class UserService {
         if (user == null) {
             log.info("User not found with the id");
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderCreditStatus.SERVER_FAILED)
+                    .status(OrderStatus.SERVER_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -151,7 +151,7 @@ public class UserService {
         if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeVideoDto.getCreditCost()) {
             log.info("something went wrong in purchase should not pass 0 credit or less than credit cost");
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderCreditStatus.SERVER_FAILED)
+                    .status(OrderStatus.SERVER_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -160,7 +160,7 @@ public class UserService {
         if (updatedCreditSum < 0) {
             log.info("not enough credit to purchase analyze video");
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderCreditStatus.PAYMENT_FAILED)
+                    .status(OrderStatus.PAYMENT_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -168,7 +168,7 @@ public class UserService {
         user.setCreditSum(updatedCreditSum);
         userRepository.save(user);
         OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                .status(OrderCreditStatus.PURCHASED)
+                .status(OrderStatus.PURCHASED)
                 .orderId(orderAnalyzeVideoDto.getOrderId())
                 .build();
         sendToQueue.sendOrderAnalyzeStatus(response);

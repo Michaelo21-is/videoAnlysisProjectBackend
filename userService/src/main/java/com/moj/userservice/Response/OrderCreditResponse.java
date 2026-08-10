@@ -1,6 +1,6 @@
 package com.moj.userservice.Response;
 
-import com.moj.userservice.Enums.OrderCreditStatus;
+import com.moj.userservice.Enums.OrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,5 +18,5 @@ public class OrderCreditResponse {
     private BigDecimal priceInUsd;
     private String email;
     private String fullName;
-    private OrderCreditStatus orderCreditStatus;
+    private OrderStatus orderStatus;
 }

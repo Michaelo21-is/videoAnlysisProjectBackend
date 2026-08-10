@@ -2,6 +2,7 @@ package com.moj.purchaseservice.Service;
 
 import com.moj.purchaseservice.Entity.OrderAnalyzeVideo;
 import com.moj.purchaseservice.Repository.OrderAnalyzeVideoRepository;
+import com.moj.purchaseservice.Response.OrderAnalyzeVideoStatusResponse;
 import com.moj.purchaseservice.Response.OrderResponse;
 import com.moj.purchaseservice.Response.ScrapingCompleteResponse;
 import com.moj.purchaseservice.Response.VideoAnalyzerDiagramResponse;
@@ -89,8 +90,8 @@ public class SseOrderAnalyzeVideoService {
             emitter.completeWithError(exception);
         }
     }
-    // when scraping is failing
-    public void sendFinalStatus(Long orderId, OrderResponse response) {
+    // when scraping is failing or purchase
+    public void sendFinalStatus(Long orderId, OrderAnalyzeVideoStatusResponse response) {
         SseEmitter emitter = emitters.remove(orderId);
         if (emitter == null) {
             return;
@@ -108,7 +109,7 @@ public class SseOrderAnalyzeVideoService {
             emitter.completeWithError(exception);
         }
     }
-    public void sendStatus(Long orderId, OrderResponse response) {
+    public void sendStatus(Long orderId, OrderAnalyzeVideoStatusResponse response) {
         SseEmitter emitter = emitters.get(orderId);
         if (emitter == null) {
             return;

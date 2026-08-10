@@ -2,6 +2,7 @@ package com.moj.purchaseservice.Controller;
 
 import com.moj.purchaseservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
+import com.moj.purchaseservice.Response.CheckOrderAnalyzeVideoStatusResponse;
 import com.moj.purchaseservice.Service.*;
 import com.moj.purchaseservice.enums.ContentType;
 import com.moj.purchaseservice.enums.SumOfContent;
@@ -66,8 +67,8 @@ public class PurchaseController {
     }
     @GetMapping("/check-order-analyze-video-id")
     public ResponseEntity<?> checkOrderId(@RequestParam("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
-        String diagramId = purchaseService.checkOrderAnalyzeVideoId(userId, orderId);
-        return ResponseEntity.ok(diagramId);
+        CheckOrderAnalyzeVideoStatusResponse response = purchaseService.checkOrderAnalyzeVideoId(userId, orderId);
+        return ResponseEntity.ok(response);
     }
     @GetMapping(value = "/order-analyze-video/status/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter getAnalyzeVideoStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {

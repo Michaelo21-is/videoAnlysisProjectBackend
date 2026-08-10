@@ -18,7 +18,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -265,7 +264,7 @@ public class PurchaseService {
         rabbitTemplate.convertAndSend(RabbitMqConfig.ANALYZE_VIDEO_EXCHANGE, RabbitMqConfig.ORDER_ANALYZE_VIDEO_ROUTING_KEY, response);
         return orderAnalyzeVideo.getId();
     }
-    public String checkOrderAnalyzeVideoId(UUID userId, Long orderId) {
+    public CheckOrderAnalyzeVideoStatusResponse checkOrderAnalyzeVideoId(UUID userId, Long orderId) {
         OrderAnalyzeVideo order = orderAnalyzeVideoRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
@@ -280,7 +279,15 @@ public class PurchaseService {
         }
 
         return switch (order.getStatus()) {
-            case SUCCEED -> order.getDiagramId();
+            case SUCCEED -> CheckOrderAnalyzeVideoStatusResponse.builder()
+                    .diagramId(order.getDiagramId())
+                    .build();
+            case SCRAPING_COMPLETED -> CheckOrderAnalyzeVideoStatusResponse.builder()
+                    .finishType(OrderAnalyzeVideoStatusType.FINISH_DOWNLOAD_VIDEO)
+                    .build();
+            case PURCHASED -> CheckOrderAnalyzeVideoStatusResponse.builder()
+                    .finishType(OrderAnalyzeVideoStatusType.PURCHASE)
+                    .build();
 
 
             case PAYMENT_FAILED -> throw new ResponseStatusException(
@@ -307,24 +314,28 @@ public class PurchaseService {
             case PURCHASED -> {
                 order.setStatus(OrderStatus.PURCHASED);
                 orderAnalyzeVideoRepository.save(order);
-                sseOrderAnalyzeVideoService.sendStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
-                        .orderId(orderStatusDto.getOrderId())
-                        .status(Status.SUCCEED)
-                        .message("Order analyze video succeeded")
-                        .build());
+                sseOrderAnalyzeVideoService.sendStatus(orderStatusDto.getOrderId()
+                , OrderAnalyzeVideoStatusResponse.builder()
+                .orderId(order.getId())
+                .status(Status.SUCCEED)
+                .message("Purchased successfully")
+                .orderAnalyzeVideoStatusType(OrderAnalyzeVideoStatusType.PURCHASE)
+                .build());
             }
             case PAYMENT_FAILED -> {
-                sseOrderAnalyzeContentService.sendFinalStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
+                sseOrderAnalyzeVideoService.sendFinalStatus(orderStatusDto.getOrderId(), OrderAnalyzeVideoStatusResponse.builder()
                         .orderId(orderStatusDto.getOrderId())
                         .status(Status.PAYMENT_FAILED)
-                        .message("Not enough credits in your account")
+                        .message("You don't have enough credits to complete this purchase.")
+                        .orderAnalyzeVideoStatusType(OrderAnalyzeVideoStatusType.PURCHASE)
                         .build());
             }
             default -> {
-                sseOrderAnalyzeContentService.sendFinalStatus(orderStatusDto.getOrderId(), OrderResponse.builder()
+                sseOrderAnalyzeVideoService.sendFinalStatus(orderStatusDto.getOrderId(), OrderAnalyzeVideoStatusResponse.builder()
                         .orderId(orderStatusDto.getOrderId())
                         .status(Status.SERVER_FAILED)
-                        .message("Not enough credits in your account")
+                        .message("Something went wrong on our server. Please try again later.")
+                        .orderAnalyzeVideoStatusType(OrderAnalyzeVideoStatusType.PURCHASE)
                         .build());
             }
         }
@@ -336,21 +347,28 @@ public class PurchaseService {
             log.error("order id is empty in scraping finished queue");
             return;
         }
+        OrderAnalyzeVideo order = orderAnalyzeVideoRepository.findById(result.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found in scraping finished queue"));
+        order.setStatus(OrderStatus.SCRAPING_COMPLETED);
+        orderAnalyzeVideoRepository.save(order);
         if (result.getStatus().equals(ScrapingStatus.FAILED)) {
-            OrderResponse response = OrderResponse.builder()
+            sseOrderAnalyzeVideoService.sendFinalStatus(result.getOrderId(),
+            OrderAnalyzeVideoStatusResponse.builder()
                     .orderId(result.getOrderId())
                     .status(Status.SERVER_FAILED)
                     .message(result.getMessage())
-                    .build();
-            sseOrderAnalyzeVideoService.sendFinalStatus(result.getOrderId(), response);
+                    .orderAnalyzeVideoStatusType(OrderAnalyzeVideoStatusType.FINISH_DOWNLOAD_VIDEO)
+                    .build());
             return;
         }
-        OrderResponse response = OrderResponse.builder()
-                .orderId(result.getOrderId())
-                .status(Status.SUCCEED)
-                .message(result.getMessage())
-                .build();
-        sseOrderAnalyzeVideoService.sendStatus(result.getOrderId(), response);
+
+        sseOrderAnalyzeVideoService.sendStatus(result.getOrderId(),
+                OrderAnalyzeVideoStatusResponse.builder()
+                        .orderId(result.getOrderId())
+                        .status(Status.SUCCEED)
+                        .message(result.getMessage())
+                        .orderAnalyzeVideoStatusType(OrderAnalyzeVideoStatusType.FINISH_DOWNLOAD_VIDEO)
+                        .build());
     }
 
     @RabbitListener(queues = RabbitMqConfig.ANALYZE_VIDEO_QUEUE)
