@@ -270,7 +270,7 @@ public class PurchaseService {
                         HttpStatus.NOT_FOUND,
                         "Order not found"
                 ));
-
+        log.info("received request to check order analyze video status for order info: {} ", order);
         if (!order.getUserId().equals(userId)) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
@@ -278,29 +278,37 @@ public class PurchaseService {
             );
         }
 
-        return switch (order.getStatus()) {
-            case SUCCEED -> CheckOrderAnalyzeVideoStatusResponse.builder()
+        if (order.getStatus() == OrderStatus.SUCCEED) {
+            log.info("order analyze video status is succeed");
+            return CheckOrderAnalyzeVideoStatusResponse.builder()
                     .diagramId(order.getDiagramId())
                     .build();
-            case SCRAPING_COMPLETED -> CheckOrderAnalyzeVideoStatusResponse.builder()
+        }
+        else if (order.getStatus() == OrderStatus.SCRAPING_COMPLETED) {
+            return CheckOrderAnalyzeVideoStatusResponse.builder()
                     .finishType(OrderAnalyzeVideoStatusType.FINISH_DOWNLOAD_VIDEO)
                     .build();
-            case PURCHASED -> CheckOrderAnalyzeVideoStatusResponse.builder()
+        }
+        else if (order.getStatus() == OrderStatus.PURCHASED) {
+             return CheckOrderAnalyzeVideoStatusResponse.builder()
                     .finishType(OrderAnalyzeVideoStatusType.PURCHASE)
                     .build();
+        }
 
-
-            case PAYMENT_FAILED -> throw new ResponseStatusException(
+        else if (order.getStatus() == OrderStatus.PAYMENT_FAILED) {
+            throw new ResponseStatusException(
                     HttpStatus.PAYMENT_REQUIRED,
                     "You don't have enough credits to analyze the video"
             );
+        }
 
-            case SERVER_FAILED -> throw new ResponseStatusException(
+        else if(order.getStatus() == OrderStatus.SERVER_FAILED){
+            throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Something went wrong while analyzing the video. Please check the link or file and try again."
+                    "Something went wrong on our server. Please try again later."
             );
-            default -> null;
-        };
+        }
+        return null;
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
     private void orderAnalyzeVideoStatus(OrderAnalyzeVideoStatusDto orderStatusDto) {
@@ -313,6 +321,7 @@ public class PurchaseService {
         switch (orderStatusDto.getStatus()) {
             case PURCHASED -> {
                 order.setStatus(OrderStatus.PURCHASED);
+                order.setPurchasedAt(Instant.now());
                 orderAnalyzeVideoRepository.save(order);
                 sseOrderAnalyzeVideoService.sendStatus(orderStatusDto.getOrderId()
                 , OrderAnalyzeVideoStatusResponse.builder()
