@@ -358,9 +358,10 @@ public class PurchaseService {
         }
         OrderAnalyzeVideo order = orderAnalyzeVideoRepository.findById(result.getOrderId())
                 .orElseThrow(() -> new RuntimeException("Order not found in scraping finished queue"));
-        order.setStatus(OrderStatus.SCRAPING_COMPLETED);
-        orderAnalyzeVideoRepository.save(order);
+
         if (result.getStatus().equals(ScrapingStatus.FAILED)) {
+            order.setStatus(OrderStatus.SERVER_FAILED);
+            orderAnalyzeVideoRepository.save(order);
             sseOrderAnalyzeVideoService.sendFinalStatus(result.getOrderId(),
             OrderAnalyzeVideoStatusResponse.builder()
                     .orderId(result.getOrderId())
@@ -370,7 +371,8 @@ public class PurchaseService {
                     .build());
             return;
         }
-
+        order.setStatus(OrderStatus.SCRAPING_COMPLETED);
+        orderAnalyzeVideoRepository.save(order);
         sseOrderAnalyzeVideoService.sendStatus(result.getOrderId(),
                 OrderAnalyzeVideoStatusResponse.builder()
                         .orderId(result.getOrderId())
@@ -389,6 +391,8 @@ public class PurchaseService {
             return;
         }
         if(!videoAnalyzerDiagramResponse.getStatus().equals(OrderStatus.SUCCEED)){
+            order.setStatus(OrderStatus.SERVER_FAILED);
+            orderAnalyzeVideoRepository.save(order);
             sseOrderAnalyzeVideoService.sendFinalStatusDiagram(videoAnalyzerDiagramResponse);
             return;
         }
@@ -396,8 +400,18 @@ public class PurchaseService {
         order.setDiagramId(videoAnalyzerDiagramResponse.getDiagramId());
         orderAnalyzeVideoRepository.save(order);
         sseOrderAnalyzeVideoService.sendFinalStatusDiagram(videoAnalyzerDiagramResponse);
+
         if (videoAnalyzerDiagramResponse.getVideoGeminiUrl() != null && !videoAnalyzerDiagramResponse.getVideoGeminiUrl().isBlank()) {
-            fileService.deleteFileFromGemini(videoAnalyzerDiagramResponse.getVideoGeminiUrl());
+            try {
+                fileService.deleteFileFromGemini(videoAnalyzerDiagramResponse.getVideoGeminiUrl());
+            } catch (Exception e) {
+                log.error(
+                        "Failed to delete Gemini file for order {}. URI: {}",
+                        videoAnalyzerDiagramResponse.getOrderId(),
+                        videoAnalyzerDiagramResponse.getVideoGeminiUrl(),
+                        e
+                );
+            }
         }
     }
     /*

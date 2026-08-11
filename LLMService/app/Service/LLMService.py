@@ -126,6 +126,8 @@ class LLMService:
                     gemini_url = await asyncio.to_thread(
                         upload_video_url_to_gemini,
                         gemini_url,
+                        video_details.get("audioUrl"),
+                        video_details.get("platform")
                     )
 
                 diagram_create = await asyncio.to_thread(

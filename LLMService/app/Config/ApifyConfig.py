@@ -1,17 +1,35 @@
 from apify_client import ApifyClient
 import os
+from typing import Any
+import logging
+
+logger = logging.getLogger(__name__)
+
 from app.Util.ExtractVideoUrlFromApify import (
     extract_instagram_reel_media,
     extract_tiktok_media,
     extract_X_video_media,
+    extract_facebook_video_media,
 )
-from typing import Any
+from app.Util.NormalizeUrl import normalize_x_url
+
 
 api_key = os.environ["APIFY_API"]
 client = ApifyClient(api_key)
 
 
-def get_tiktok_video_with_url(url) -> dict[str, Any]:
+def get_first_dataset_item(result) -> dict[str, Any]:
+    dataset_id = result.default_dataset_id
+    items = client.dataset(dataset_id).iterate_items()
+    item = next(items, None)
+
+    if item is None:
+        raise ValueError("Apify did not return any dataset items")
+
+    return item
+
+
+def get_tiktok_video_with_url(url: str) -> dict[str, Any]:
     run_input = {
         "postURLs": [url],
         "scrapeRelatedVideos": False,
@@ -19,39 +37,47 @@ def get_tiktok_video_with_url(url) -> dict[str, Any]:
         "shouldDownloadVideos": True,
         "shouldDownloadCovers": False,
         "downloadSubtitlesOptions": "NEVER_DOWNLOAD_SUBTITLES",
-        "shouldDownloadSlideshowImages": True,
+        "shouldDownloadSlideshowImages": False,
         "videoKvStoreIdOrName": "tiktok-videos",
     }
 
-    # Run the Actor and wait for it to finish
-    result = client.actor("S5h7zRLfKFEr8pdj7").call(run_input=run_input)
-    items = client.dataset(result["defaultDatasetId"]).iterate_items()
-    item = next(items, None)
-    if item is None:
-        raise ValueError("No Instagram Reel was found")
+    result = client.actor("S5h7zRLfKFEr8pdj7").call(
+        run_input=run_input
+    )
+
+    item = get_first_dataset_item(result)
+    logger.info("TikTok Apify item: %s", item)
+    logger.info("TikTok videoMeta: %s", item.get("videoMeta"))
+    logger.info("TikTok mediaUrls: %s", item.get("mediaUrls"))
+
     return extract_tiktok_media(item)
 
-def get_instagram_video_with_url(reel_url: str) -> dict[str: Any]:
+
+def get_instagram_video_with_url(
+    reel_url: str,
+) -> dict[str, Any]:
     run_input = {
         "username": [reel_url],
         "resultsLimit": 1,
-        "onlyPostsNewerThan": None,
         "skipPinnedPosts": False,
         "skipTrialReels": False,
         "includeSharesCount": False,
         "includeTranscript": False,
-        "includeDownloadedVideo": True,
+        "includeDownloadedVideo": False,
     }
-    result = client.actor("xMc5Ga1oCONPmWJIa").call(run_input=run_input)
-    items = client.dataset(result["defaultDatasetId"] ).iterate_items()
-    item = next(items, None)
 
-    if item is None:
-        raise ValueError("No Instagram Reel was found")
+    result = client.actor("xMc5Ga1oCONPmWJIa").call(
+        run_input=run_input
+    )
+
+    item = get_first_dataset_item(result)
+
     return extract_instagram_reel_media(item)
 
 
 def get_x_video_with_url(url: str) -> dict[str, Any]:
+    url = normalize_x_url(url)
+
     run_input = {
         "tweetUrls": [url],
         "includeAllQualities": True,
@@ -62,23 +88,24 @@ def get_x_video_with_url(url: str) -> dict[str, Any]:
         run_input=run_input
     )
 
-    for item in client.dataset(result["defaultDatasetId"]).iterate_items():
-        return extract_X_video_media(item)
+    item = get_first_dataset_item(result)
 
-    raise ValueError("No Twitter video was found")
-def get_facebook_video_with_url(url: str) -> dict[str, Any]:
+    return extract_X_video_media(item)
+
+
+def get_facebook_video_with_url( url: str,) -> dict[str, Any]:
     run_input = {
-        "url": url,
-        "urls": None,
+        "urls": url,
         "proxyConfiguration": {
             "useApifyProxy": True,
             "apifyProxyGroups": ["RESIDENTIAL"],
         },
     }
-    result = client.actor("bd0BAhBSbiGcmv4ho").call(run_input=run_input)
-    items = client.dataset(result["defaultDatasetId"]).iterate_items()
-    items = next(items, None)
-    if not items:
-        raise ValueError("No Facebook video was found")
-    return items
 
+    result = client.actor("bd0BAhBSbiGcmv4ho").call(
+        run_input=run_input
+    )
+
+    item = get_first_dataset_item(result)
+
+    return extract_facebook_video_media(item)

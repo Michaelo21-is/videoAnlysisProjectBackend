@@ -1,18 +1,20 @@
 import os
+from app.Util.CheckUrlPlatform import Platform
 
 from google import genai
 from pydantic import ValidationError
 import shutil
 import tempfile
+import subprocess
 import time
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 
 from app.Schemea.DiagramSchema import DiagramCreate
 
 client = genai.Client()
 
 
-def analyze_video_url( video_url: str, prompt: str,) -> DiagramCreate:
+def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
     interaction = client.interactions.create(
         model="gemini-3.6-flash",
         input=[
@@ -40,21 +42,91 @@ def analyze_video_url( video_url: str, prompt: str,) -> DiagramCreate:
         raise ValueError(
             "Gemini response does not match DiagramCreate"
         ) from error
-def upload_video_url_to_gemini(video_url: str):
-    temp_path = None
+def upload_video_url_to_gemini(
+    video_url: str,
+    audio_url: str | None = None,
+    platform: Platform | None = None,
+):
+    video_path = None
+    audio_path = None
+    merged_path = None
 
     try:
+        # 1. Download video
         with tempfile.NamedTemporaryFile(
             delete=False,
             suffix=".mp4",
-        ) as temp_file:
-            temp_path = temp_file.name
+        ) as video_file:
+            video_path = video_file.name
 
-            with urlopen(video_url) as response:
-                shutil.copyfileobj(response, temp_file)
+            if platform == Platform.TIKTOK:
+                request = Request(
+                    video_url,
+                    headers={
+                        "Authorization": (
+                            f"Bearer {os.environ['APIFY_API']}"
+                        )
+                    },
+                )
 
+                with urlopen(request) as response:
+                    shutil.copyfileobj(
+                        response,
+                        video_file,
+                    )
+
+            else:
+                with urlopen(video_url) as response:
+                    shutil.copyfileobj(
+                        response,
+                        video_file,
+                    )
+
+        file_to_upload = video_path
+
+        # 2. Separate audio stream
+        if audio_url:
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=".mp4",
+            ) as audio_file:
+                audio_path = audio_file.name
+
+                with urlopen(audio_url) as response:
+                    shutil.copyfileobj(
+                        response,
+                        audio_file,
+                    )
+
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=".mp4",
+            ) as merged_file:
+                merged_path = merged_file.name
+
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i", video_path,
+                    "-i", audio_path,
+                    "-map", "0:v:0",
+                    "-map", "1:a:0",
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-movflags", "+faststart",
+                    merged_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            file_to_upload = merged_path
+
+        # 3. Upload to Gemini Files
         gemini_file = client.files.upload(
-            file=temp_path,
+            file=file_to_upload,
         )
 
         while (
@@ -74,9 +146,20 @@ def upload_video_url_to_gemini(video_url: str):
 
         return gemini_file.uri
 
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(
+            f"Failed to merge Instagram video and audio: "
+            f"{error.stderr}"
+        ) from error
+
     finally:
-        if temp_path:
-            try:
-                os.remove(temp_path)
-            except FileNotFoundError:
-                pass
+        for path in (
+            video_path,
+            audio_path,
+            merged_path,
+        ):
+            if path:
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass

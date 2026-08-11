@@ -1,46 +1,34 @@
 from typing import Any
 from app.Util.CheckUrlPlatform import Platform
 
-def extract_tiktok_media(item: dict[str, Any]) -> dict[str, Any]:
+def extract_tiktok_media(
+    item: dict[str, Any],
+) -> dict[str, Any]:
+
     if error_code := item.get("errorCode"):
-        error_message = item.get("error") or "Unknown Apify error"
-        raise RuntimeError(f"{error_code}: {error_message}")
+        error_message = (
+            item.get("error")
+            or "Unknown Apify error"
+        )
 
-    video_name = item.get("text")
-    if not isinstance(video_name, str) or not video_name.strip():
-        raise ValueError("Apify did not return the TikTok video name")
-
-    video_name = video_name.strip()
+        raise RuntimeError(
+            f"{error_code}: {error_message}"
+        )
 
     if item.get("isSlideshow") is True:
-        slideshow_images = item.get("slideshowImageLinks") or []
-        image_urls: list[str] = []
+        raise ValueError(
+            "TikTok slideshow posts are not supported"
+        )
 
-        for image in slideshow_images:
-            if not isinstance(image, dict):
-                continue
+    video_name = (
+            item.get("text")
+            or f"TikTok video {item.get('id', '')}"
+    )
 
-            image_url = (
-                image.get("downloadLink")
-                or image.get("tiktokLink")
-            )
-
-            if (
-                isinstance(image_url, str)
-                and image_url.startswith(("https://", "http://"))
-            ):
-                image_urls.append(image_url)
-
-        if not image_urls:
-            raise ValueError(
-                "Apify did not return TikTok slideshow download URLs"
-            )
-
-        return {
-            "name": video_name,
-            "urls": image_urls,
-            "platform": Platform.TIKTOK
-        }
+    video_name = (
+            str(video_name).strip()
+            or "TikTok video"
+    )
 
     video_meta = item.get("videoMeta") or {}
     media_urls = item.get("mediaUrls") or []
@@ -54,23 +42,29 @@ def extract_tiktok_media(item: dict[str, Any]) -> dict[str, Any]:
     for video_url in possible_urls:
         if (
             isinstance(video_url, str)
-            and video_url.startswith(("https://", "http://"))
+            and video_url.startswith(
+                ("https://", "http://")
+            )
         ):
             return {
                 "name": video_name,
                 "urls": [video_url],
-                "platform": Platform.TIKTOK
+                "platform": Platform.TIKTOK,
             }
 
     raise ValueError(
         "Apify did not return the TikTok video download URL"
     )
-def extract_instagram_reel_media(  item: dict[str, Any],) -> dict[str, Any]:
+def extract_instagram_reel_media(
+    item: dict[str, Any],
+) -> dict[str, Any]:
+
     if error_code := item.get("error"):
         error_description = (
             item.get("errorDescription")
             or "Unknown Instagram scraping error"
         )
+
         raise RuntimeError(
             f"{error_code}: {error_description}"
         )
@@ -82,22 +76,22 @@ def extract_instagram_reel_media(  item: dict[str, Any],) -> dict[str, Any]:
             "Apify did not return the Instagram Reel name"
         )
 
-    downloaded_video_url = item.get("downloadedVideo")
+    video_url = item.get("videoUrl")
+    audio_url = item.get("audioUrl")
 
     if (
-        not isinstance(downloaded_video_url, str)
-        or not downloaded_video_url.startswith(
-            ("https://", "http://")
-        )
+        not isinstance(video_url, str)
+        or not video_url.startswith(("https://", "http://"))
     ):
         raise ValueError(
-            "Apify did not return the Instagram Reel download URL"
+            "Apify did not return the Instagram Reel video URL"
         )
 
     return {
         "name": reel_name.strip(),
-        "urls": [downloaded_video_url],
-        "platform": Platform.INSTAGRAM
+        "urls": [video_url],
+        "audioUrl": audio_url,
+        "platform": Platform.INSTAGRAM,
     }
 def extract_X_video_media(item: dict[str, Any]) -> dict[str, Any]:
     status = item.get("status")
