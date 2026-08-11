@@ -3,7 +3,10 @@ from textwrap import dedent
 from app.Util.CheckUrlPlatform import Platform
 
 
-def build_video_url_analysis_prompt(platform: Platform, video_name: str | None = None, ) -> str:
+def build_video_url_analysis_prompt(
+    platform: Platform,
+    video_name: str | None = None,
+) -> str:
     known_video_name = (
         video_name.strip()
         if isinstance(video_name, str) and video_name.strip()
@@ -14,13 +17,11 @@ def build_video_url_analysis_prompt(platform: Platform, video_name: str | None =
         title_context = """
         TITLE RULES:
         - The provided video is a YouTube video.
-        - Extract the actual title of the provided YouTube video.
-        - Return the extracted YouTube title in the top-level "name" field.
-        - Do not use the YouTube URL as the name.
-        - Do not use the channel name as the video name.
-        - Do not generate a generic or descriptive title when the actual
-          YouTube title is available.
-        - If the actual title cannot be reliably determined, return
+        - Extract the actual YouTube video title.
+        - Return it in the top-level "name" field.
+        - Do not use the URL or channel name as the title.
+        - Do not generate a replacement title when the real title is available.
+        - If the title cannot be reliably determined, return
           "Untitled YouTube video".
         - Never invent a title.
         """
@@ -28,146 +29,179 @@ def build_video_url_analysis_prompt(platform: Platform, video_name: str | None =
         title_context = f"""
         TITLE RULES:
         - The video name was already extracted from the source platform.
-        - Return exactly the following value in the top-level "name" field:
+        - Return exactly this value in the top-level "name" field:
           "{known_video_name}"
-        - Do not extract another name from the video.
-        - Do not rewrite, summarize, translate, shorten, or replace the
-          provided video name.
+        - Do not rewrite, shorten, translate, summarize, or replace it.
         - Do not use the video URL as the name.
         """
 
     return dedent(
         f"""
-        You are an expert short-form and long-form video analyst.
+        You are an expert video structure analyst.
 
         Analyze the entire provided video and convert its structure into a
-        diagram that matches the DiagramCreate JSON schema described below.
+        concise chronological storyboard matching the DiagramCreate JSON schema.
 
         Source platform: {platform.value}
 
         {title_context}
 
         ANALYSIS GOAL:
-        Create a chronological diagram that explains how the video is
-        structured, why each section exists, and how the sections connect
-        to one another.
+        Break the video into only the meaningful sections a person needs to
+        quickly understand how the video is structured.
 
         The diagram may contain only these node types:
         1. "hook"
         2. "videoPart"
         3. "cta"
 
-        NODE RULES:
-        - Create one "hook" node for the opening section that captures
+        NODE CREATION RULES:
+        - Start with one "hook" node representing the opening that captures
           attention.
-        - Split the body into multiple "videoPart" nodes whenever there is a
-          meaningful change in topic, scene, argument, demonstration,
-          story beat, or purpose.
-        - Create a "cta" node when the video contains an explicit or implicit
-          call to action.
-        - If there is no call to action, create one "cta" node whose text
-          clearly says that no CTA was detected.
-        - Do not invent a CTA that does not exist.
-        - Keep the nodes in the same chronological order as the video.
-        - Do not combine unrelated sections into one node.
-        - Do not create unnecessary nodes for minor visual changes that do
-          not affect the meaning or structure.
+        - Create a new "videoPart" only when there is a meaningful change in
+          topic, scene, argument, demonstration, story beat, or purpose.
+        - Do not create nodes for small cuts, camera changes, captions, or
+          minor visual changes.
+        - Create a "cta" node when an explicit or implicit CTA exists.
+        - If no CTA exists, create one final "cta" node stating briefly that
+          no CTA was detected.
+        - Never invent events, dialogue, or a CTA.
+        - Keep all nodes in chronological order.
+        - Prefer fewer useful nodes over many detailed nodes.
 
-        Every node's "text" must clearly describe all important detected
-        details:
+        NODE TEXT RULES:
+        Node text must be concise and easy to scan.
 
-        - Section title
-        - Approximate start and end timestamps
-        - What happens in this section
-        - Spoken message, narration, or dialogue
-        - Important visual content or actions
-        - Important on-screen text or captions
-        - Editing style, cuts, transitions, pacing, or camera movement
-        - Music, sound effects, silence, or important audio changes
-        - The purpose of the section
-        - Why the section is important to the video's effectiveness
+        Each node should normally contain only:
+        - Approximate timestamp range.
+        - A short description of what happens.
+        - One notable detail ONLY when something especially important,
+          unusual, attention-grabbing, or structurally significant happens.
 
-        HOOK ANALYSIS:
-        For the hook, also identify:
-        - The hook technique
-        - The curiosity gap, promise, question, surprise, problem, or visual
-          pattern used to gain attention
-        - Why a viewer may continue watching
-        - Whether the hook is visual, verbal, textual, audio-based, or a
-          combination
+        Recommended format:
+        "00:00-00:04 | Opens with a surprising result before explaining it."
 
-        VIDEO PART ANALYSIS:
-        For every videoPart, also identify:
-        - Its role in the story or explanation
-        - The information or emotional value it provides
-        - How it maintains attention
-        - How it leads into the next section
+        When something notable happens:
+        "00:04-00:10 | Demonstrates the product. Notable: fast before/after reveal."
 
-        CTA ANALYSIS:
-        For the CTA, identify:
-        - The requested viewer action
-        - Whether the CTA is spoken, visual, written, or implied
-        - Its placement and timing
-        - How it relates to the rest of the video
+        Keep each node focused on the main beat.
+        Aim for roughly 10-30 words per node when possible.
+
+
+        Mention one of those only when it is important to understanding why
+        that specific section stands out.
+
+        HOOK:
+        - Briefly describe what happens in the opening.
+        - Mention the hook technique only if it is useful or distinctive.
+        - Do not add a long explanation of why the hook works.
+
+        VIDEO PART:
+        - Describe the main event, information, demonstration, or story beat.
+        - Split into another node only when the video's purpose meaningfully changes.
+
+        CTA:
+        - State the action requested from the viewer.
+        - Keep it short.
+        - If no CTA exists, use wording such as:
+          "00:42-00:45 | No CTA detected."
 
         CONNECTION RULES:
-        - Connect every node chronologically using arrows.
-        - Every arrow must use the exact ID of its source and target nodes.
-        - The "text" of every arrow must briefly explain the transition or
-          relationship.
-        - Do not create arrows that point to missing nodes.
+        - Connect every node chronologically.
+        - Use the exact source and target node IDs.
         - Do not leave nodes disconnected.
-        - The first node should normally be the hook.
-        - The final node should normally be the CTA when one exists.
+        - Do not create arrows to missing nodes.
+        - Arrow text must contain MAXIMUM 3 WORDS.
+        - Prefer simple transition labels such as:
+          "Builds tension"
+          "Shows result"
+          "Explains why"
+          "Then demonstrates"
+          "Leads to CTA"
+          "Adds proof"
+        - Never write a sentence inside an arrow.
 
         GENERATED PROMPT RULES:
-        The top-level "prompt" field must contain a detailed, standalone
-        prompt for creating a new original video inspired by the analyzed
-        video's successful structure.
+        The top-level "prompt" field must contain a standalone prompt for
+        creating a new original video inspired by the analyzed structure.
 
-        The generated prompt must include:
-        - The main content goal
-        - Intended target audience
-        - Recommended hook approach
-        - Chronological scene or section plan
-        - Key messages to communicate
-        - Visual direction
-        - Speaking or narration style
-        - Editing pace and transition style
-        - On-screen text and caption approach
-        - Audio or music direction
-        - Recommended CTA
-        - Important structural patterns found in the source video
+        It should describe:
+        - The main content goal.
+        - Target audience.
+        - Hook approach.
+        - Chronological scene structure.
+        - Key messages.
+        - Visual direction.
+        - Narration or speaking style.
+        - Editing pace.
+        - On-screen text approach.
+        - Audio direction.
+        - Recommended CTA.
+        - Important structural patterns found in the source video.
 
-        The generated prompt must preserve useful structures and techniques
-        without copying exact sentences, protected characters, branding, or
-        the creator's identity from the source video.
+        Preserve useful structures and techniques, but do not copy exact
+        sentences, branding, protected characters, or the creator's identity.
 
         LAYOUT RULES:
-        - Generate a unique UUID string for every node and arrow.
-        - Arrange nodes from left to right in chronological order.
-        - Use approximately 360 pixels of horizontal spacing between nodes.
-        - Use a width of 320 and a height of at least 220 for each node.
-        - Increase the height when the text requires more space.
-        - Use y = 100 for the first row.
-        - When there are more than four nodes, continue on another row.
-        - Use zIndex = 1 for every node.
+        The diagram should look like a left-to-right storyboard.
+
+        Use these approximate positions as the visual pattern:
+
+        Node 1:
+        x = 90
+        y = 110
+
+        Node 2:
+        x = 430
+        y = 300
+
+        Node 3:
+        x = 770
+        y = 110
+
+        Node 4:
+        x = 1110
+        y = 300
+
+        For additional nodes:
+        - Continue from left to right.
+        - Add approximately 340 to x for every new node.
+        - Alternate y between approximately 110 and 300.
+        - Do not stack nodes on top of each other.
+        - Keep enough empty space between nodes for arrows and arrow labels.
+        - Do not force the diagram into only four nodes.
+        - The number of nodes must depend on the actual video structure.
+
+        Example continuation:
+        Node 5: x = 1450, y = 110
+        Node 6: x = 1790, y = 300
+        Node 7: x = 2130, y = 110
+
+        For every node:
+        - width = 240
+        - height = 180
+        - zIndex = 1
+
+        Do not increase node height just because more analysis is available.
+        Keep the text concise enough to fit the note.
+
+        Generate a unique UUID string for every node and arrow.
 
         Return exactly one valid JSON object with this structure:
 
         {{
           "name": "Video title",
-          "prompt": "Detailed standalone prompt for creating a new video",
+          "prompt": "Standalone prompt for creating a new original video",
           "private": true,
           "nodes": [
             {{
               "id": "unique UUID",
               "type": "hook | videoPart | cta",
-              "text": "Complete section analysis",
-              "x": 80,
-              "y": 100,
-              "width": 320,
-              "height": 220,
+              "text": "00:00-00:04 | Short description of what happens.",
+              "x": 90,
+              "y": 110,
+              "width": 240,
+              "height": 180,
               "zIndex": 1
             }}
           ],
@@ -176,7 +210,7 @@ def build_video_url_analysis_prompt(platform: Platform, video_name: str | None =
               "id": "unique UUID",
               "sourceNodeId": "existing source node UUID",
               "targetNodeId": "existing target node UUID",
-              "text": "Short explanation of the transition"
+              "text": "Builds tension"
             }}
           ]
         }}
@@ -189,147 +223,202 @@ def build_video_url_analysis_prompt(platform: Platform, video_name: str | None =
         - Use only the documented fields.
         - Use only valid node types.
         - Ensure every required field is present.
+        - Ensure every arrow text contains no more than 3 words.
+        - Ensure node text stays concise.
         - Ensure the result can be validated directly as DiagramCreate.
         """
     ).strip()
 
+
 def build_video_file_analysis_prompt() -> str:
     return dedent(
         """
-        You are an expert short-form and long-form video analyst.
+        You are an expert video structure analyst.
 
-        The user uploaded an MP4 video video.
+        The user uploaded an MP4 video.
 
         Analyze the entire uploaded video and convert its structure into a
-        diagram that matches the DiagramCreate JSON schema described below.
+        concise chronological storyboard matching the DiagramCreate JSON schema.
 
         TITLE RULES:
         - Determine the video's title from its actual content.
         - If a reliable title appears visually or is clearly spoken, use it
           in the top-level "name" field.
-        - Otherwise, generate a short and accurate descriptive title based
-          only on the uploaded video's content.
+        - Otherwise, create a short descriptive title based only on the
+          video's actual content.
         - Do not invent unrelated details.
-        - Do not use a generic value such as "Uploaded video" unless no
-          meaningful title can be determined.
+        - Avoid generic titles such as "Uploaded video" when a meaningful
+          descriptive title can be created.
 
         ANALYSIS GOAL:
-        Create a chronological diagram that explains how the video is
-        structured, why each section exists, and how the sections connect
-        to one another.
+        Break the video into only the meaningful sections a person needs to
+        quickly understand how the video is structured.
 
         The diagram may contain only these node types:
         1. "hook"
         2. "videoPart"
         3. "cta"
 
-        NODE RULES:
-        - Create one "hook" node for the opening section that captures
+        NODE CREATION RULES:
+        - Start with one "hook" node representing the opening that captures
           attention.
-        - Split the body into multiple "videoPart" nodes whenever there is a
-          meaningful change in topic, scene, argument, demonstration,
-          story beat, or purpose.
-        - Create a "cta" node when the video contains an explicit or implicit
-          call to action.
-        - If there is no call to action, create one "cta" node whose text
-          clearly states that no CTA was detected.
-        - Do not invent a CTA that does not exist.
-        - Keep all nodes in the same chronological order as the video.
-        - Do not combine unrelated sections into one node.
-        - Do not create unnecessary nodes for minor visual changes.
+        - Create a new "videoPart" only when there is a meaningful change in
+          topic, scene, argument, demonstration, story beat, or purpose.
+        - Do not create nodes for small cuts, camera changes, captions, or
+          minor visual changes.
+        - Create a "cta" node when an explicit or implicit CTA exists.
+        - If no CTA exists, create one final "cta" node stating briefly that
+          no CTA was detected.
+        - Never invent events, dialogue, or a CTA.
+        - Keep all nodes in chronological order.
+        - Prefer fewer useful nodes over many detailed nodes.
 
-        Every node's "text" must include:
+        NODE TEXT RULES:
+        Node text must be concise and easy to scan.
 
-        - A short section title
-        - Approximate start and end timestamps
-        - What happens in the section
-        - Spoken dialogue, narration, or message
-        - Important visuals and actions
-        - Important on-screen text or captions
-        - Editing style, transitions, pacing, and camera movement
-        - Music, sound effects, silence, or important audio changes
-        - The purpose of the section
-        - Why the section is important to the video's effectiveness
+        Each node should normally contain only:
+        - Approximate timestamp range.
+        - A short description of what happens.
+        - One notable detail ONLY when something especially important,
+          unusual, attention-grabbing, or structurally significant happens.
 
-        HOOK ANALYSIS:
-        For the hook, also identify:
-        - The hook technique
-        - The curiosity gap, promise, question, surprise, or problem
-        - Why a viewer may continue watching
-        - Whether the hook is visual, verbal, textual, audio-based, or a
-          combination
+        Recommended format:
+        "00:00-00:04 | Opens with a surprising result before explaining it."
 
-        VIDEO PART ANALYSIS:
-        For every "videoPart", also identify:
-        - Its role in the story or explanation
-        - The information or emotional value it provides
-        - How it maintains the viewer's attention
-        - How it leads into the next section
+        When something notable happens:
+        "00:04-00:10 | Demonstrates the product. Notable: fast before/after reveal."
 
-        CTA ANALYSIS:
-        For the CTA, identify:
-        - The requested viewer action
-        - Whether it is spoken, visual, written, or implied
-        - Its placement and timing
-        - How it relates to the rest of the video
+        Keep each node focused on the main beat.
+        Aim for roughly 10-30 words per node when possible.
+
+        DO NOT turn node text into a full analysis report.
+
+        Do not list all of these separately:
+        - dialogue
+        - visuals
+        - captions
+        - camera movement
+        - transitions
+        - editing
+        - music
+        - sound effects
+        - purpose
+        - effectiveness
+
+        Mention one of those only when it is important to understanding why
+        that specific section stands out.
+
+        HOOK:
+        - Briefly describe what happens in the opening.
+        - Mention the hook technique only if it is useful or distinctive.
+        - Do not add a long explanation of why the hook works.
+
+        VIDEO PART:
+        - Describe the main event, information, demonstration, or story beat.
+        - Split into another node only when the video's purpose meaningfully changes.
+
+        CTA:
+        - State the action requested from the viewer.
+        - Keep it short.
+        - If no CTA exists, use wording such as:
+          "00:42-00:45 | No CTA detected."
 
         CONNECTION RULES:
-        - Connect every node chronologically using arrows.
-        - Every arrow must use the exact ID of its source and target nodes.
-        - Every arrow's "text" must briefly explain the transition.
-        - Do not create arrows that point to missing nodes.
+        - Connect every node chronologically.
+        - Use the exact source and target node IDs.
         - Do not leave nodes disconnected.
-        - The first node should normally be the hook.
-        - The final node should normally be the CTA.
+        - Do not create arrows to missing nodes.
+        - Arrow text must contain MAXIMUM 3 WORDS.
+        - Prefer simple transition labels such as:
+          "Builds tension"
+          "Shows result"
+          "Explains why"
+          "Then demonstrates"
+          "Leads to CTA"
+          "Adds proof"
+        - Never write a sentence inside an arrow.
 
         GENERATED PROMPT RULES:
-        The top-level "prompt" field must contain a detailed, standalone
-        prompt for creating a new original video inspired by the analyzed
-        video's successful structure.
+        The top-level "prompt" field must contain a standalone prompt for
+        creating a new original video inspired by the analyzed structure.
 
-        The generated prompt must include:
-        - The main content goal
-        - The intended target audience
-        - The recommended hook approach
-        - A chronological scene or section plan
-        - Key messages
-        - Visual direction
-        - Speaking or narration style
-        - Editing pace and transitions
-        - On-screen text and captions
-        - Audio or music direction
-        - A recommended CTA
-        - Important structural patterns found in the uploaded video
+        It should describe:
+        - The main content goal.
+        - Target audience.
+        - Hook approach.
+        - Chronological scene structure.
+        - Key messages.
+        - Visual direction.
+        - Narration or speaking style.
+        - Editing pace.
+        - On-screen text approach.
+        - Audio direction.
+        - Recommended CTA.
+        - Important structural patterns found in the uploaded video.
 
-        Preserve useful structures and techniques without copying exact
-        sentences, protected characters, branding, or the original
-        creator's identity.
+        Preserve useful structures and techniques, but do not copy exact
+        sentences, branding, protected characters, or the creator's identity.
 
         LAYOUT RULES:
-        - Generate a unique UUID string for every node and arrow.
-        - Arrange nodes from left to right in chronological order.
-        - Use approximately 360 pixels of horizontal spacing.
-        - Use a width of 320 and a height of at least 220 for every node.
-        - Increase the height when the text requires more space.
-        - Use y = 100 for the first row.
-        - When there are more than four nodes, continue on another row.
-        - Use zIndex = 1 for every node.
+        The diagram should look like a left-to-right storyboard.
+
+        Use these approximate positions as the visual pattern:
+
+        Node 1:
+        x = 90
+        y = 110
+
+        Node 2:
+        x = 430
+        y = 300
+
+        Node 3:
+        x = 770
+        y = 110
+
+        Node 4:
+        x = 1110
+        y = 300
+
+        For additional nodes:
+        - Continue from left to right.
+        - Add approximately 340 to x for every new node.
+        - Alternate y between approximately 110 and 300.
+        - Do not stack nodes on top of each other.
+        - Keep enough empty space between nodes for arrows and arrow labels.
+        - Do not force the diagram into only four nodes.
+        - The number of nodes must depend on the actual video structure.
+
+        Example continuation:
+        Node 5: x = 1450, y = 110
+        Node 6: x = 1790, y = 300
+        Node 7: x = 2130, y = 110
+
+        For every node:
+        - width = 240
+        - height = 180
+        - zIndex = 1
+
+        Do not increase node height just because more analysis is available.
+        Keep the text concise enough to fit the note.
+
+        Generate a unique UUID string for every node and arrow.
 
         Return exactly one valid JSON object with this structure:
 
         {
           "name": "Video title",
-          "prompt": "Detailed standalone prompt for creating a new video",
+          "prompt": "Standalone prompt for creating a new original video",
           "private": true,
           "nodes": [
             {
               "id": "unique UUID",
               "type": "hook | videoPart | cta",
-              "text": "Complete section analysis",
-              "x": 80,
-              "y": 100,
-              "width": 320,
-              "height": 220,
+              "text": "00:00-00:04 | Short description of what happens.",
+              "x": 90,
+              "y": 110,
+              "width": 240,
+              "height": 180,
               "zIndex": 1
             }
           ],
@@ -338,7 +427,7 @@ def build_video_file_analysis_prompt() -> str:
               "id": "unique UUID",
               "sourceNodeId": "existing source node UUID",
               "targetNodeId": "existing target node UUID",
-              "text": "Short explanation of the transition"
+              "text": "Builds tension"
             }
           ]
         }
@@ -351,6 +440,8 @@ def build_video_file_analysis_prompt() -> str:
         - Use only the documented fields.
         - Use only valid node types.
         - Ensure every required field is present.
+        - Ensure every arrow text contains no more than 3 words.
+        - Ensure node text stays concise.
         - Ensure the result can be validated directly as DiagramCreate.
         """
     ).strip()
