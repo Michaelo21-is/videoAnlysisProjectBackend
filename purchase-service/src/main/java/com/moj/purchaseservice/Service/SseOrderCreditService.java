@@ -124,4 +124,11 @@ public class SseOrderCreditService {
         return emitter;
     }
 
+    public void closeConnection(Long orderId) {
+        SseEmitter emitter = emitters.remove(orderId);
+        if (emitter != null) {
+            emitter.complete();
+        }
+    }
+
 }

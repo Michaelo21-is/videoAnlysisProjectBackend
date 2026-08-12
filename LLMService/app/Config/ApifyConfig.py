@@ -1,9 +1,7 @@
 from apify_client import ApifyClient
 import os
 from typing import Any
-import logging
 
-logger = logging.getLogger(__name__)
 
 from app.Util.ExtractVideoUrlFromApify import (
     extract_instagram_reel_media,
@@ -46,10 +44,6 @@ def get_tiktok_video_with_url(url: str) -> dict[str, Any]:
     )
 
     item = get_first_dataset_item(result)
-    logger.info("TikTok Apify item: %s", item)
-    logger.info("TikTok videoMeta: %s", item.get("videoMeta"))
-    logger.info("TikTok mediaUrls: %s", item.get("mediaUrls"))
-
     return extract_tiktok_media(item)
 
 

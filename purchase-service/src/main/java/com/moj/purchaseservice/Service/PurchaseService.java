@@ -18,6 +18,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -126,6 +127,9 @@ public class PurchaseService {
     ///
     /// order analyze content request
     ///
+    ///
+    /// order credit
+    ///
     public Long orderCredit(UUID userId, OrderCreditDto orderCredit){
         if (userId == null) {
             throw new RuntimeException("problem with security configurations in api gateway");
@@ -146,6 +150,15 @@ public class PurchaseService {
 
 
         return order.getId();
+    }
+    @Transactional
+    public void deleteOrderCredit(Long orderId, UUID userId){
+        int result = orderCreditRepository.deleteByIdAndUserIdAndStatus(orderId, userId, OrderStatus.PENDING);
+        if(result == 0){
+            log.error("cannot delete the order credit with order id: {} and user id: {}", orderId, userId);
+            return;
+        }
+        sseOrderCreditService.closeConnection(orderId);
     }
     public void orderCreditPurchasedSuccessfully(Long orderId) {
         log.info("order credit purchased successfully");

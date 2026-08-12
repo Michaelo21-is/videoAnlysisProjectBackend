@@ -45,11 +45,17 @@ public class PurchaseController {
         return ResponseEntity.ok().build();
     }
 
+
     @GetMapping(value = "/order-credit/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter getOrderCreditStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
         return sseOrderCreditService.OrderAnalyzeStatusSSE(orderId, userId);
     }
 
+    @DeleteMapping("/cancel-order-credit")
+    public ResponseEntity<?> cancelOrderCredit(@RequestHeader("X-USER-ID") UUID userId, @RequestParam("orderId") Long orderId) {
+        purchaseService.deleteOrderCredit(orderId, userId);
+        return ResponseEntity.ok().build();
+    }
     @PostMapping("/analyze-content-request")
     public ResponseEntity<?> analyzeContent(@RequestHeader("X-USER-ID") UUID userId
             , @RequestParam("amount") SumOfContent sumOfContent, @RequestParam("contentType") ContentType contentType) {
