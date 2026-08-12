@@ -40,6 +40,11 @@ class LLMService:
             )
 
             if platform == Platform.NOT_SUPPORT:
+                logger.error(
+                    "Video URL is not supported, url: %s",
+                    analyze_video_schema.video_url
+                )
+
                 response = AnalyzeVideoResponse(
                     status=AnalyzeVideoStatus.SERVER_FAILED,
                     message="Video URL is not supported",

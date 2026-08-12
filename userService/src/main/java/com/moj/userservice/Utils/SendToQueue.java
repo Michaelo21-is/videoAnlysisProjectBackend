@@ -58,4 +58,11 @@ public class SendToQueue {
                 response
         );
     }
+    public void sendUserRefund(Long orderId) {
+        rabbitTemplate.convertAndSend(
+                RabbitMqConfig.USER_REFUND_QUEUE,
+                RabbitMqConfig.USER_REFUND_ROUTING_KEY,
+                orderId
+        );
+    }
 }

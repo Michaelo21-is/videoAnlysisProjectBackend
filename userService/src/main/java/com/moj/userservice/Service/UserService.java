@@ -1,6 +1,7 @@
 package com.moj.userservice.Service;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
+import com.moj.userservice.Dto.FailedAnalyzeVideoDto;
 import com.moj.userservice.Dto.OrderAnalyzeDto;
 import com.moj.userservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.userservice.Dto.OrderCreditDto;
@@ -26,9 +27,12 @@ import java.util.UUID;
 public class UserService {
     private final UserRepository userRepository;
     private final SendToQueue sendToQueue;
-    public UserService(UserRepository userRepository,  SendToQueue sendToQueue) {
+    private final LimitUserRefundService limitUserRefundService;
+    public UserService(UserRepository userRepository,  SendToQueue sendToQueue,
+                       LimitUserRefundService limitUserRefundService) {
         this.userRepository = userRepository;
         this.sendToQueue = sendToQueue;
+        this.limitUserRefundService = limitUserRefundService;
     }
     public UserDetailsResponse getUserDetails(UUID userId) {
         if (userId == null) {
@@ -151,7 +155,7 @@ public class UserService {
         if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeVideoDto.getCreditCost()) {
             log.info("something went wrong in purchase should not pass 0 credit or less than credit cost");
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderStatus.SERVER_FAILED)
+                    .status(OrderStatus.PAYMENT_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -179,6 +183,26 @@ public class UserService {
                 .userId(orderAnalyzeVideoDto.getUserId())
                 .build();
         sendToQueue.sendOrderToAnalyzeVideo(orderAnalyzeVideoResponse);
+    }
+    @RabbitListener(queues = RabbitMqConfig.FAILED_ANALYZE_VIDEO_QUEUE)
+    public void handleFailedAnalyzeVideo(FailedAnalyzeVideoDto failedAnalyzeVideoDto) {
+        if (failedAnalyzeVideoDto.getCredit() == null || failedAnalyzeVideoDto.getUserId() == null || failedAnalyzeVideoDto.getOrderId() ==null) {
+            log.info("some of the parameters are null: {}", failedAnalyzeVideoDto);
+            return;
+        }
+        if (!limitUserRefundService.tryRefundVideoAnalyze(failedAnalyzeVideoDto.getOrderId())) {
+            log.info(
+                    "Refund already handled for order id: {}",
+                    failedAnalyzeVideoDto.getOrderId()
+            );
+            return;
+        }
+        int addCredit = userRepository.addCredit(failedAnalyzeVideoDto.getUserId(), failedAnalyzeVideoDto.getCredit());
+        if (addCredit == 0) {
+            log.info("Failed to add credit to user with id: {}", failedAnalyzeVideoDto.getUserId());
+            return;
+        }
+        sendToQueue.sendUserRefund(failedAnalyzeVideoDto.getOrderId());
     }
     /// ***
     /// purchase area

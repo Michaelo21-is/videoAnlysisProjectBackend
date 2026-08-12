@@ -46,6 +46,20 @@ public class RabbitMqConfig {
 
     public static final String SCRAPING_FINISHED_QUEUE = "scraping-finished-queue";
 
+    public static final String FAILED_ANALYZE_VIDEO_QUEUE = "failed-analyze-video-queue";
+    public static final String FAILED_ANALYZE_VIDEO_ROUTING_KEY = "failed.analyze.video";
+
+    public static final String USER_REFUND_QUEUE = "user-refund-queue";
+
+
+
+    @Bean
+    public Queue userRefundQueue() {
+        return QueueBuilder
+                .durable(USER_REFUND_QUEUE)
+                .build();
+    }
+
     @Bean
     public Queue analyzeVideoQueue() {
         return QueueBuilder
@@ -188,6 +202,19 @@ public class RabbitMqConfig {
                 .bind(queue)
                 .to(exchange)
                 .with(ORDER_ANALYZE_VIDEO_ROUTING_KEY);
+    }
+    @Bean
+    public Queue failedAnalyzeVideoQueue() {
+        return QueueBuilder
+                .durable(FAILED_ANALYZE_VIDEO_QUEUE)
+                .build();
+    }
+    @Bean
+    public Binding failedAnalyzeVideoBinding(@Qualifier("failedAnalyzeVideoQueue") Queue queue, @Qualifier("orderAnalyzeVideoExchange") DirectExchange exchange){
+        return BindingBuilder
+                .bind(queue)
+                .to(exchange)
+                .with(FAILED_ANALYZE_VIDEO_ROUTING_KEY);
     }
     @Bean
     public MessageConverter messageConverter() {

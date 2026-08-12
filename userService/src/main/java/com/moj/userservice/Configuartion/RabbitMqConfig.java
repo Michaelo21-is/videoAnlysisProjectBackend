@@ -33,6 +33,17 @@ public class RabbitMqConfig {
     public static final String ANALYZE_VIDEO_ROUTING_KEY = "video-analyze-routing-key";
     public static final String ANALYZE_VIDEO_QUEUE = "video-analyze-queue";
 
+    public static final String FAILED_ANALYZE_VIDEO_QUEUE = "failed-analyze-video-queue";
+
+    public static final String USER_REFUND_QUEUE = "user-refund-queue";
+    public static final String USER_REFUND_ROUTING_KEY = "user-refund-routing-key";
+
+    @Bean
+    public Queue failedAnalyzeVideoQueue() {
+        return QueueBuilder
+                .durable(FAILED_ANALYZE_VIDEO_QUEUE)
+                .build();
+    }
 
     @Bean
     public Queue orderAnalyzeVideoStatusQueue() {
@@ -106,6 +117,21 @@ public class RabbitMqConfig {
         return new DirectExchange(
                 ORDER_CREDIT_STATUS_EXCHANGE
         );
+    }
+
+    @Bean
+    public Queue userRefundQueue() {
+        return QueueBuilder
+                .durable(USER_REFUND_QUEUE)
+                .build();
+    }
+
+    @Bean
+    public Binding userRefundBinding(@Qualifier("userRefundQueue") Queue userRefundQueue, @Qualifier("analyzeVideoExchange") DirectExchange analyzeVideoExchange) {
+        return BindingBuilder
+                .bind(userRefundQueue)
+                .to(analyzeVideoExchange)
+                .with(USER_REFUND_ROUTING_KEY);
     }
 
     @Bean
