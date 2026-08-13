@@ -68,3 +68,6 @@ def get_diagram_by_query(user_id: Annotated[UUID, Header(alias="X-USER-ID")],
         user_id=user_id,
         page=page,
     )
+@router.delete("/delete-diagram")
+def delete_diagram(diagram_id: Annotated[str, Query()], user_id: Annotated[UUID, Header(alias="X-USER-ID")]) -> None:
+    diagram_service.delete_diagram(diagram_id=diagram_id,user_id=user_id,)

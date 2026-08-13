@@ -58,11 +58,7 @@ class DiagramService:
             )
             raise
 
-    def update_diagram(
-            self,
-            diagram: DiagramUpdate,
-            user_id: UUID,
-    ) -> None:
+    def update_diagram(  self, diagram: DiagramUpdate, user_id: UUID,) -> None:
         try:
             document = self.diagram_collection.find_one({
                 "_id": diagram.id,
@@ -229,7 +225,7 @@ class DiagramService:
                 user_id,
             )
             raise
-    def get_user_diagrams(self, user_id: UUID, page: int = 1, limit: int = 9, firstTimeRequest: bool = False) -> UserDiagramsResponse:
+    def get_user_diagrams(self, user_id: UUID, page: int = 1, limit: int = 12, firstTimeRequest: bool = False) -> UserDiagramsResponse:
         try:
             skip = (page - 1) * limit
             totalPages: int | None = None
@@ -367,6 +363,30 @@ class DiagramService:
         except Exception:
             logger.exception(
                 "Error getting diagram: diagram_id=%s, user_id=%s",
+                diagram_id,
+                user_id,
+            )
+            raise
+
+    def delete_diagram(self, diagram_id: str, user_id: UUID) -> None:
+        try:
+            result = self.diagram_collection.delete_one({
+                "_id": diagram_id,
+                "userId": str(user_id),
+            })
+
+            if result.deleted_count == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Diagram not found or access denied",
+                )
+
+        except HTTPException:
+            raise
+
+        except Exception:
+            logger.exception(
+                "Error deleting diagram: diagram_id=%s, user_id=%s",
                 diagram_id,
                 user_id,
             )

@@ -392,10 +392,7 @@ public class PurchaseService {
         return orderAnalyzeVideo.getId();
     }
 
-    public CheckOrderAnalyzeVideoStatusResponse checkOrderAnalyzeVideoId(
-            UUID userId,
-            Long orderId
-    ) {
+    public CheckOrderAnalyzeVideoStatusResponse checkOrderAnalyzeVideoId(UUID userId, Long orderId) {
 
         OrderAnalyzeVideo order =
                 orderAnalyzeVideoRepository.findById(orderId)
@@ -442,7 +439,7 @@ public class PurchaseService {
                     "You don't have enough credits to analyze the video"
             );
         }
-        else if (order.getStatus() == OrderStatus.FAIL_TO_SCRAPE) {
+        else if (order.getStatus() == OrderStatus.FAIL_TO_SCRAPE || order.getStatus() == OrderStatus.REFUND_COMPLETED) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_CONTENT,
                     "We couldn't process this video. Make sure the link is from a supported platform and the video is publicly accessible."
@@ -459,11 +456,8 @@ public class PurchaseService {
     }
 
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
-    public void orderAnalyzeVideoStatus(
-            OrderAnalyzeVideoStatusDto orderStatusDto
-    ) {
+    public void orderAnalyzeVideoStatus(OrderAnalyzeVideoStatusDto orderStatusDto) {
 
-        log.info("order analyze video status received");
 
         if (orderStatusDto.getStatus() == null) {
             return;
@@ -476,15 +470,25 @@ public class PurchaseService {
         switch (orderStatusDto.getStatus()) {
 
             case PURCHASED -> {
-                order.setStatus(OrderStatus.PURCHASED);
-                order.setPurchasedAt(Instant.now());
+                int updated = orderAnalyzeVideoRepository.updateStatusIfCurrent(
+                        orderStatusDto.getOrderId(),
+                        OrderStatus.PENDING,
+                        OrderStatus.PURCHASED,
+                        Instant.now()
+                );
 
-                orderAnalyzeVideoRepository.save(order);
+                if (updated == 0) {
+                    log.warn(
+                            "Ignoring PURCHASED event for order {} because it is no longer PENDING",
+                            orderStatusDto.getOrderId()
+                    );
+                    return;
+                }
 
                 sseOrderAnalyzeVideoService.sendStatus(
                         orderStatusDto.getOrderId(),
                         OrderAnalyzeVideoStatusResponse.builder()
-                                .orderId(order.getId())
+                                .orderId(orderStatusDto.getOrderId())
                                 .status(Status.SUCCEED)
                                 .message("Purchased successfully")
                                 .orderAnalyzeVideoStatusType(
@@ -516,7 +520,7 @@ public class PurchaseService {
                                 .orderId(orderStatusDto.getOrderId())
                                 .status(Status.SERVER_FAILED)
                                 .message(
-                                        "Something went wrong on our server. Please try again later."
+                                        "Something went wrong while processing your video. Please check that the file or link you provided meets the requirements. If everything looks correct, please try again later."
                                 )
                                 .orderAnalyzeVideoStatusType(
                                         OrderAnalyzeVideoStatusType.PURCHASE
@@ -545,7 +549,7 @@ public class PurchaseService {
 
     @RabbitListener(queues = RabbitMqConfig.SCRAPING_FINISHED_QUEUE)
     public void getScrapingStatus(ScrapingCompleteResponse result) {
-
+        log.info("scraping finished response received \n{}", result);
         if (result.getOrderId() == null) {
             log.error("order id is empty in scraping finished queue");
             return;
@@ -609,9 +613,7 @@ public class PurchaseService {
     }
 
     @RabbitListener(queues = RabbitMqConfig.ANALYZE_VIDEO_QUEUE)
-    public void analyzeVideoResponse(
-            VideoAnalyzerDiagramResponse videoAnalyzerDiagramResponse
-    ) {
+    public void analyzeVideoResponse(VideoAnalyzerDiagramResponse videoAnalyzerDiagramResponse) {
         log.info("analyze video response received \n{}", videoAnalyzerDiagramResponse);
         OrderAnalyzeVideo order =
                 orderAnalyzeVideoRepository
@@ -642,11 +644,6 @@ public class PurchaseService {
 
             order.setStatus(OrderStatus.SERVER_FAILED);
 
-            orderAnalyzeVideoRepository.save(order);
-
-            sseOrderAnalyzeVideoService
-                    .sendFinalStatusDiagram(videoAnalyzerDiagramResponse);
-
         } else {
 
             order.setStatus(OrderStatus.SUCCEED);
@@ -654,11 +651,10 @@ public class PurchaseService {
                     videoAnalyzerDiagramResponse.getDiagramId()
             );
 
-            orderAnalyzeVideoRepository.save(order);
-
-            sseOrderAnalyzeVideoService
-                    .sendFinalStatusDiagram(videoAnalyzerDiagramResponse);
         }
+        orderAnalyzeVideoRepository.save(order);
+        sseOrderAnalyzeVideoService
+                .sendFinalStatusDiagram(videoAnalyzerDiagramResponse);
 
         if (videoAnalyzerDiagramResponse.getVideoGeminiUrl() != null
                 && !videoAnalyzerDiagramResponse

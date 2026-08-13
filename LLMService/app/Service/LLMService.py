@@ -45,15 +45,15 @@ class LLMService:
                     analyze_video_schema.video_url
                 )
 
-                response = AnalyzeVideoResponse(
-                    status=AnalyzeVideoStatus.SERVER_FAILED,
-                    message="Video URL is not supported",
+                scraping_response = ScrapingCompletedResponse(
                     order_id=analyze_video_schema.order_id,
+                    status=ScrapingStatus.FAILED,
+                    message="The provided video link is not supported",
                 )
 
                 await rabbitmq_manager.publish(
-                    payload=response,
-                    routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
+                    payload=scraping_response,
+                    routing_key=SCRAPING_FINISHED_ROUTING_KEY,
                 )
                 return
 
