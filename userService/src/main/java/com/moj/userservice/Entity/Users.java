@@ -24,4 +24,6 @@ public class Users {
 
     private Long creditSum;
 
+    @Column(name = "time_zone")
+    private String timeZone;
 }

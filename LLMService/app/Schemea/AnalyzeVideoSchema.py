@@ -28,6 +28,14 @@ class AnalyzeVideoSchema(BaseModel):
         default=None,
         alias="videoGeminiUrl",
     )
+    business_context : str | None = Field(
+        default=None,
+        alias="businessContext",
+    )
+    business_target_audience : str | None = Field(
+        default=None,
+        alias="businessTargetAudience",
+    )
 
 class AnalyzeVideoResponse(BaseModel):
     diagram_id: str | None = None

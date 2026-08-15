@@ -1,12 +1,10 @@
 package com.moj.userservice.Controller;
 
+import com.moj.userservice.Dto.BusinessDetailsDto;
 import com.moj.userservice.Response.UserDetailsResponse;
 import com.moj.userservice.Service.UserService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
@@ -21,5 +19,20 @@ public class UserController {
     public ResponseEntity<UserDetailsResponse> getUserDetails(@RequestHeader("X-USER-ID") UUID userId) {
         UserDetailsResponse userDetailsResponse = userService.getUserDetails(userId);
         return ResponseEntity.ok(userDetailsResponse);
+    }
+    @PostMapping("/set-business-details")
+    public ResponseEntity<?> setBusinessDetails(@RequestHeader("X-USER-ID") UUID userId, @RequestBody BusinessDetailsDto businessDetailsDto) {
+        userService.setBusinessDetails(userId, businessDetailsDto);
+        return ResponseEntity.ok().build();
+    }
+    @GetMapping("/get-business-details")
+    public ResponseEntity<BusinessDetailsDto> getBusinessDetails(@RequestHeader("X-USER-ID") UUID userId){
+        BusinessDetailsDto businessDetailsDto = userService.getBusinessDetails(userId);
+        return ResponseEntity.ok(businessDetailsDto);
+    }
+    @PutMapping("/update-business-details")
+    public ResponseEntity<?> updateBusinessDetails(@RequestHeader("X-USER-ID") UUID userId, @RequestBody BusinessDetailsDto businessDetailsDto){
+        userService.updateBusinessDetails(userId, businessDetailsDto);
+        return ResponseEntity.ok().build();
     }
 }

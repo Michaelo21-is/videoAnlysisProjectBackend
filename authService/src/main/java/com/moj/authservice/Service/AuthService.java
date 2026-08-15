@@ -68,6 +68,7 @@ public class AuthService {
                     .status(HttpStatus.BAD_REQUEST)
                     .build();
         }
+
         if(usersRepository.existsByEmail(signUpDto.getEmail())){
             return TempTokenResponse.builder()
                     .message("email already exists")
@@ -84,6 +85,7 @@ public class AuthService {
                 .role(Role.USER)
                 .createdDate(LocalDate.now())
                 .creditSum(0L)
+                .timeZone(signUpDto.getTimeZone())
                 .build();
         usersRepository.save(user);
         setTwoFactor(user.getId(), TwoFactorType.EMAILVERIFICATION);

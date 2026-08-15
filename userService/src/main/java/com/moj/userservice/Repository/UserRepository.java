@@ -23,5 +23,4 @@ public interface UserRepository extends JpaRepository<Users, UUID> {
             @Param("userId") UUID userId,
             @Param("amount") Long amount
     );
-
 }

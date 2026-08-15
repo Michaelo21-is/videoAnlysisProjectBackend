@@ -19,12 +19,7 @@ public class RabbitMqConfig {
 
     public static final String ORDER_ANALYZE_CONTENT_EXCHANGE = "order-analyze-content-exchange";
     public static final String ORDER_ANALYZE_CONTENT_QUEUE = "order-analyze-content-queue";
-    public static final String ORDER_ANALYZE_CONTENT_ROUTING_KEY = "order.analyze.content";
-
-
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE = "order-analyze-content-status-queue";
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE = "order-analyze-content-status-exchange";
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY = "order-analyze-content-analyzeOrderStatus-routing-key";
+    public static final String ORDER_ANALYZE_CONTENT_ROUTING_KEY = "order.analyze-content.routing-key";
 
 
     public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
@@ -106,31 +101,9 @@ public class RabbitMqConfig {
                 .with(ORDER_ANALYZE_CONTENT_ROUTING_KEY);
     }
 
-    @Bean
-    public DirectExchange orderAnalyzeContentStatusExchange() {
-        return new DirectExchange(
-                ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE
-        );
-    }
 
-    @Bean
-    public Queue orderAnalyzeContentStatusQueue() {
-        return QueueBuilder
-                .durable(ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
-                .build();
-    }
 
-    @Bean
-    public Binding orderAnalyzeContentStatusBinding(
-            @Qualifier("orderAnalyzeContentStatusQueue") Queue queue,
-            @Qualifier("orderAnalyzeContentStatusExchange")
-            DirectExchange exchange
-    ) {
-        return BindingBuilder
-                .bind(queue)
-                .to(exchange)
-                .with(ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY);
-    }
+
 
 
     @Bean

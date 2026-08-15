@@ -1,13 +1,12 @@
 package com.moj.userservice.Service;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
-import com.moj.userservice.Dto.FailedAnalyzeVideoDto;
-import com.moj.userservice.Dto.OrderAnalyzeDto;
-import com.moj.userservice.Dto.OrderAnalyzeVideoDto;
-import com.moj.userservice.Dto.OrderCreditDto;
+import com.moj.userservice.Dto.*;
+import com.moj.userservice.Entity.BusinessContext;
 import com.moj.userservice.Entity.Users;
 import com.moj.userservice.Enums.AnalyzeOrderStatus;
 import com.moj.userservice.Enums.OrderStatus;
+import com.moj.userservice.Repository.BusinessContextRepository;
 import com.moj.userservice.Repository.UserRepository;
 import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
 import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
@@ -28,11 +27,13 @@ public class UserService {
     private final UserRepository userRepository;
     private final SendToQueue sendToQueue;
     private final LimitUserRefundService limitUserRefundService;
+    private final BusinessContextRepository businessContextRepository;
     public UserService(UserRepository userRepository,  SendToQueue sendToQueue,
-                       LimitUserRefundService limitUserRefundService) {
+       LimitUserRefundService limitUserRefundService, BusinessContextRepository businessContextRepository) {
         this.userRepository = userRepository;
         this.sendToQueue = sendToQueue;
         this.limitUserRefundService = limitUserRefundService;
+        this.businessContextRepository = businessContextRepository;
     }
     public UserDetailsResponse getUserDetails(UUID userId) {
         if (userId == null) {
@@ -50,11 +51,78 @@ public class UserService {
                 .creditSum(user.getCreditSum())
                 .build();
     }
+    public void setBusinessDetails(UUID userId, BusinessDetailsDto businessDetailsDto) {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (businessDetailsDto.getBusinessName() == null || businessDetailsDto.getBusinessName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Business name is missing");
+        }
 
+        if (businessDetailsDto.getNiche() == null || businessDetailsDto.getNiche().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Niche is missing");
+        }
+        BusinessContext businessContext = BusinessContext.builder()
+                .users(user)
+                .businessName(businessDetailsDto.getBusinessName())
+                .niche(businessDetailsDto.getNiche())
+                .description(businessDetailsDto.getDescription())
+                .targetAudience(businessDetailsDto.getTargetAudience())
+                .build();
+        businessContextRepository.save(businessContext);
+    }
+
+    public BusinessDetailsDto getBusinessDetails(UUID userId){
+        if (!userRepository.existsById(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+        BusinessContext businessContext = businessContextRepository.findByUsers_Id(userId)
+                .orElse(null);
+        if (businessContext == null) {
+            return BusinessDetailsDto.builder().build();
+        }
+        return BusinessDetailsDto.builder()
+                .businessName(businessContext.getBusinessName())
+                .niche(businessContext.getNiche())
+                .description(businessContext.getDescription())
+                .targetAudience(businessContext.getTargetAudience())
+                .build();
+    }
+    public void updateBusinessDetails(UUID userId, BusinessDetailsDto businessDetailsDto) {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found"
+                ));
+        BusinessContext businessContext = businessContextRepository
+                .findByUsers_Id(userId)
+                .orElseGet(() -> BusinessContext.builder()
+                        .users(user)
+                        .build()
+                );
+
+
+        if (businessDetailsDto.getBusinessName() != null && !businessDetailsDto.getBusinessName().isBlank()) {
+            businessContext.setBusinessName(businessDetailsDto.getBusinessName());
+        }
+        if (businessDetailsDto.getNiche() != null && !businessDetailsDto.getNiche().isBlank()) {
+            businessContext.setNiche(businessDetailsDto.getNiche());
+        }
+        if (businessDetailsDto.getDescription() != null && !businessDetailsDto.getDescription().isBlank()) {
+            businessContext.setDescription(businessDetailsDto.getDescription());
+        }
+        if (businessDetailsDto.getTargetAudience() != null && !businessDetailsDto.getTargetAudience().isBlank()) {
+            businessContext.setTargetAudience(businessDetailsDto.getTargetAudience());
+        }
+        businessContextRepository.save(businessContext);
+    }
 
     /// ***
     /// purchase area
     /// ***
+
+    ///
+    /// analyze content
+    ///
     @Transactional
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_QUEUE)
     public void handleOrderAnalyzeContent(OrderAnalyzeDto orderAnalyzeDto) {
@@ -72,7 +140,7 @@ public class UserService {
                 .orElse(null);
 
         if (user == null) {
-            log.info("User not found");
+            log.info("User not found in handle order analyze content");
             sendToQueue.sendOrderStatus(
                     orderAnalyzeDto.getOrderId(),
                     AnalyzeOrderStatus.SERVER_FAILED
@@ -105,7 +173,13 @@ public class UserService {
                 AnalyzeOrderStatus.SUCCEED
         );
     }
+    /// ***
+    /// analyze content
+    /// ***
 
+    /// ***
+    /// order credit
+    /// ***
     @RabbitListener(queues = RabbitMqConfig.ORDER_CREDIT_QUEUE)
     @Transactional
     public void handleOrderCredit(OrderCreditDto orderCreditDto) {
@@ -131,11 +205,19 @@ public class UserService {
         log.info("Credit added");
         sendToQueue.sendOrderCreditStatus(orderCreditDto, OrderStatus.SUCCEED);
     }
+
+    /// ***
+    /// order credit
+    /// ***
+
+    /// ***
+    /// order analyze video
+    /// ***
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_QUEUE)
     public void handleOrderAnalyzeVideo(OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
         log.info("reccived order deatils, info: {}", orderAnalyzeVideoDto);
         if (orderAnalyzeVideoDto.getUserId() == null || orderAnalyzeVideoDto.getCreditCost() == null || orderAnalyzeVideoDto.getOrderId() == null) {
-            log.info("some of the parameters are null: {}", orderAnalyzeVideoDto);
+            log.info("some of the parameters are null in handle order analyze video: \n {}", orderAnalyzeVideoDto);
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
                     .status(OrderStatus.SERVER_FAILED)
                     .build();
@@ -176,11 +258,15 @@ public class UserService {
                 .orderId(orderAnalyzeVideoDto.getOrderId())
                 .build();
         sendToQueue.sendOrderAnalyzeStatus(response);
+        BusinessContext businessContext = businessContextRepository.findByUsers_Id(orderAnalyzeVideoDto.getUserId())
+                .orElse(null);
         OrderAnalyzeVideoResponse orderAnalyzeVideoResponse = OrderAnalyzeVideoResponse.builder()
                 .videoGeminiUrl(orderAnalyzeVideoDto.getVideoGeminiUrl())
                 .videoUrl(orderAnalyzeVideoDto.getVideoUrl())
                 .orderId(orderAnalyzeVideoDto.getOrderId())
                 .userId(orderAnalyzeVideoDto.getUserId())
+                .businessContext(businessContext != null ? businessContext.getDescription() : null)
+                .businessTargetAudience(businessContext != null ? businessContext.getTargetAudience() : null)
                 .build();
         sendToQueue.sendOrderToAnalyzeVideo(orderAnalyzeVideoResponse);
     }
@@ -204,6 +290,10 @@ public class UserService {
         }
         sendToQueue.sendUserRefund(failedAnalyzeVideoDto.getOrderId());
     }
+    /// ***
+    /// order analyze video
+    /// ***
+
     /// ***
     /// purchase area
     /// ***

@@ -16,4 +16,6 @@ public class OrderAnalyzeVideoResponse {
     private UUID userId;
     private String videoUrl;
     private String videoGeminiUrl;
+    private String businessContext;
+    private String businessTargetAudience;
 }

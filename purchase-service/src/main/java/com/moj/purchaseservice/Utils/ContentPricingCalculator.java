@@ -1,34 +1,35 @@
 package com.moj.purchaseservice.Utils;
 
-import com.moj.purchaseservice.enums.ContentType;
 import com.moj.purchaseservice.enums.SumOfContent;
-import lombok.experimental.UtilityClass;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-@UtilityClass
+@Component
 public class ContentPricingCalculator {
 
-    public long calculateCreditCost(
-            SumOfContent contentAmount,
-            ContentType contentType
+    private final Long threeVideoCreditPrice;
+    private final Long fiveVideoCreditPrice;
+    private final Long sevenVideoCreditPrice;
+
+    public ContentPricingCalculator(
+            @Value("${analyze-content.3-videos}") Long threeVideoCreditPrice,
+            @Value("${analyze-content.5-videos}") Long fiveVideoCreditPrice,
+            @Value("${analyze-content.7-videos}") Long sevenVideoCreditPrice
     ) {
-        return switch (contentType) {
-            case VIDEO -> switch (contentAmount) {
-                case THREE -> 100L;
-                case FIVE -> 150L;
-                case EIGHT -> 200L;
-            };
+        this.threeVideoCreditPrice = threeVideoCreditPrice;
+        this.fiveVideoCreditPrice = fiveVideoCreditPrice;
+        this.sevenVideoCreditPrice = sevenVideoCreditPrice;
+    }
 
-            case IMAGE -> switch (contentAmount) {
-                case THREE -> 50L;
-                case FIVE -> 80L;
-                case EIGHT -> 100L;
-            };
+    public Long calculatePricingByNumOfContents(SumOfContent sumOfContent) {
+        if (sumOfContent == null) {
+            throw new IllegalArgumentException("Sum of content cannot be null");
+        }
 
-            case TEXT -> switch (contentAmount) {
-                case THREE -> 25L;
-                case FIVE -> 40L;
-                case EIGHT -> 50L;
-            };
+        return switch (sumOfContent) {
+            case THREE -> threeVideoCreditPrice;
+            case FIVE -> fiveVideoCreditPrice;
+            case SEVEN-> sevenVideoCreditPrice;
         };
     }
 }

@@ -124,6 +124,9 @@ class LLMService:
             prompt = build_video_url_analysis_prompt(
                 video_details["platform"],
                 video_details["name"],
+                analyze_video_schema.business_context,
+                analyze_video_schema.business_target_audience,
+
             )
             gemini_url = video_details["urls"][0]
             try:
@@ -182,7 +185,7 @@ class LLMService:
 
         # 3. המשתמש העלה קובץ ל-gemini
         elif analyze_video_schema.video_gemini_url is not None:
-            prompt = build_video_file_analysis_prompt()
+            prompt = build_video_file_analysis_prompt(analyze_video_schema.business_context, analyze_video_schema.business_target_audience, )
 
             try:
                 diagram_create = await asyncio.to_thread(

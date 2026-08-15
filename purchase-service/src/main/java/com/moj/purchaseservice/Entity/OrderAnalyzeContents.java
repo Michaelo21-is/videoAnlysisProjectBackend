@@ -1,7 +1,7 @@
 package com.moj.purchaseservice.Entity;
 
-import com.moj.purchaseservice.enums.ContentType;
 import com.moj.purchaseservice.enums.OrderAnalyzeVideoStatus;
+import com.moj.purchaseservice.enums.Platform;
 import com.moj.purchaseservice.enums.SumOfContent;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -21,8 +21,15 @@ import java.util.UUID;
 public class OrderAnalyzeContents {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_analyze_content_id_generator")
-    @SequenceGenerator(name = "order_analyze_content_id_generator", sequenceName = "order_analyze_content_id_seq", allocationSize = 1)
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "order_analyze_content_id_generator"
+    )
+    @SequenceGenerator(
+            name = "order_analyze_content_id_generator",
+            sequenceName = "order_analyze_content_id_seq",
+            allocationSize = 1
+    )
     @Column(nullable = false)
     private Long id;
 
@@ -34,8 +41,8 @@ public class OrderAnalyzeContents {
     private SumOfContent sumOfContent;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "content_type", nullable = false)
-    private ContentType contentType;
+    @Column(name = "platform", nullable = false)
+    private Platform platform;
 
     @Column(name = "credit_cost", nullable = false)
     private Long creditCost;

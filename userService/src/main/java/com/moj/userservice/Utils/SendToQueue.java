@@ -25,8 +25,8 @@ public class SendToQueue {
                         .build();
 
         rabbitTemplate.convertAndSend(
-                RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE,
-                RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY,
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE,
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_ROUTING_KEY,
                 response
         );
     }

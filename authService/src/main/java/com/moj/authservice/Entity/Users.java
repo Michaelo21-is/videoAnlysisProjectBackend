@@ -44,7 +44,7 @@ public class Users {
     @Column(nullable = false, name = "user_verified_email")
     private boolean userVerifiedEmail;
 
-
-
+    @Column(name = "time_zone")
+    private String timeZone;
 
 }

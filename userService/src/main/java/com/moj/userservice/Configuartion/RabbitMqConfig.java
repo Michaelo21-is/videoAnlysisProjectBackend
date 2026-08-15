@@ -14,8 +14,10 @@ public class RabbitMqConfig {
 
 
     public static final String ORDER_ANALYZE_CONTENT_QUEUE = "order-analyze-content-queue";
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE = "order-analyze-content-status-exchange";
-    public static final String ORDER_ANALYZE_CONTENT_STATUS_ROUTING_KEY = "order-analyze-content-analyzeOrderStatus-routing-key";
+
+    public static final String ORDER_ANALYZE_CONTENT_EXCHANGE = "order-analyze-content-exchange";
+    public static final String ORDER_ANALYZE_CONTENT_ROUTING_KEY = "order-analyze-content.status-routing-key";
+    public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE = "order-analyze-content-status-queue";
 
     public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
     public static final String ORDER_CREDIT_STATUS_EXCHANGE = "order-credit-status-exchange";
@@ -55,6 +57,7 @@ public class RabbitMqConfig {
     public DirectExchange analyzeVideoExchange() {
         return new DirectExchange(ANALYZE_VIDEO_EXCHANGE);
     }
+
     @Bean
     public Binding orderAnalyzeVideoStatusBinding(@Qualifier("orderAnalyzeVideoStatusQueue")
             Queue orderAnalyzeVideoStatusQueue,
@@ -108,8 +111,21 @@ public class RabbitMqConfig {
     @Bean
     public DirectExchange orderAnalyzeContentStatusExchange() {
         return new DirectExchange(
-                ORDER_ANALYZE_CONTENT_STATUS_EXCHANGE
+                ORDER_ANALYZE_CONTENT_EXCHANGE
         );
+    }
+    @Bean
+    public Queue orderAnalyzeContentStatusQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
+                .build();
+    }
+    @Bean
+    public Binding orderAnalyzeContentStatusBinding(@Qualifier("orderAnalyzeContentStatusQueue") Queue orderAnalyzeContentStatusQueue, @Qualifier("orderAnalyzeContentStatusExchange") DirectExchange orderAnalyzeContentStatusExchange) {
+        return BindingBuilder
+                .bind(orderAnalyzeContentStatusQueue)
+                .to(orderAnalyzeContentStatusExchange)
+                .with(ORDER_ANALYZE_CONTENT_ROUTING_KEY);
     }
 
     @Bean

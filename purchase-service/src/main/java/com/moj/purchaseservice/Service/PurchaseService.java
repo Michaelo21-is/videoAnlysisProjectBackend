@@ -30,6 +30,7 @@ public class PurchaseService {
 
     private final RabbitTemplate rabbitTemplate;
     private final OrderAnalyzeContentsRepository orderAnalyzeContentRepository;
+    private final ContentPricingCalculator contentPricingCalculator;
     private final SseOrderAnalyzeContentService sseOrderAnalyzeContentService;
     private final OrderCreditRepository orderCreditRepository;
     private final PaddleResolvePackage paddleResolvePackage;
@@ -49,7 +50,7 @@ public class PurchaseService {
             @Value("${video-analysis.credit-cost}") Long costOfOrderVideoAnalyze,
             OrderAnalyzeVideoRepository orderAnalyzeVideoRepository,
             SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService,
-            FileService fileService
+            FileService fileService, ContentPricingCalculator contentPricingCalculator
     ) {
         this.orderAnalyzeContentRepository = orderAnalyzeContentRepository;
         this.rabbitTemplate = rabbitTemplate;
@@ -61,18 +62,20 @@ public class PurchaseService {
         this.orderAnalyzeVideoRepository = orderAnalyzeVideoRepository;
         this.sseOrderAnalyzeVideoService = sseOrderAnalyzeVideoService;
         this.fileService = fileService;
+        this.contentPricingCalculator = contentPricingCalculator;
     }
 
-    ///
-    /// order analyze content request
-    ///
-    public Long orderAnalyzeContent(UUID userId, SumOfContent sumOfContent, ContentType contentType) {
-        Long credit = ContentPricingCalculator.calculateCreditCost(sumOfContent, contentType);
+    /// ***
+    /// order analyze content
+    /// ***
+    public Long orderAnalyzeContent(UUID userId, OrderAnalyzeContentDto orderAnalyzeContentDto) {
+
+        Long creditCost = contentPricingCalculator.calculatePricingByNumOfContents(sumOfContent);
 
         OrderAnalyzeContents orderAnalyzeContents = OrderAnalyzeContents.builder()
                 .userId(userId)
                 .status(OrderAnalyzeVideoStatus.PENDING)
-                .sumOfContent(sumOfContent)
+                .sumOfContent(creditCost)
                 .contentType(contentType)
                 .creditCost(credit)
                 .build();
@@ -95,63 +98,9 @@ public class PurchaseService {
 
         return orderAnalyzeContents.getId();
     }
-
-    @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
-    public void orderAnalyzeContentStatus(OrderAnalyzeVideoStatusDto orderStatusDto) {
-        if (orderStatusDto.getStatus() == null) {
-            return;
-        }
-
-        OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(orderStatusDto.getOrderId())
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-
-        OrderResponse response;
-
-        switch (orderStatusDto.getStatus()) {
-            case PURCHASED -> {
-                order.setStatus(OrderAnalyzeVideoStatus.PURCHASED);
-                order.setPurchasedAt(Instant.now());
-                orderAnalyzeContentRepository.save(order);
-
-                response = OrderResponse.builder()
-                        .status(Status.SUCCEED)
-                        .orderId(orderStatusDto.getOrderId())
-                        .message("Order analyze content succeeded")
-                        .build();
-            }
-
-            case PAYMENT_FAILED -> {
-                order.setStatus(OrderAnalyzeVideoStatus.PAYMENT_FAILED);
-                orderAnalyzeContentRepository.save(order);
-
-                response = OrderResponse.builder()
-                        .orderId(orderStatusDto.getOrderId())
-                        .status(Status.PAYMENT_FAILED)
-                        .message("Not enough credits in your account")
-                        .build();
-            }
-
-            case SERVER_FAILED -> {
-                order.setStatus(OrderAnalyzeVideoStatus.SERVER_FAILED);
-                orderAnalyzeContentRepository.save(order);
-
-                response = OrderResponse.builder()
-                        .orderId(orderStatusDto.getOrderId())
-                        .status(Status.PAYMENT_FAILED)
-                        .message("Something went wrong with our server, please try again later")
-                        .build();
-            }
-
-            default -> {
-                return;
-            }
-        }
-
-        sseOrderAnalyzeContentService.sendFinalStatus(
-                orderStatusDto.getOrderId(),
-                response
-        );
-    }
+    ///
+    /// order analyze content
+    ///
 
     ///
     /// order credit
