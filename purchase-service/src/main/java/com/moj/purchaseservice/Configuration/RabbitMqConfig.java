@@ -21,6 +21,7 @@ public class RabbitMqConfig {
     public static final String ORDER_ANALYZE_CONTENT_QUEUE = "order-analyze-content-queue";
     public static final String ORDER_ANALYZE_CONTENT_ROUTING_KEY = "order.analyze-content.routing-key";
 
+    public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE = "order-analyze-content-status-queue";
 
     public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
     public static final String ORDER_CREDIT_EXCHANGE = "order-credit-exchange";
@@ -189,6 +190,14 @@ public class RabbitMqConfig {
                 .to(exchange)
                 .with(FAILED_ANALYZE_VIDEO_ROUTING_KEY);
     }
+
+    @Bean
+    public Queue orderAnalyzeContentStatusQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
+                .build();
+    }
+
     @Bean
     public MessageConverter messageConverter() {
         return new JacksonJsonMessageConverter();

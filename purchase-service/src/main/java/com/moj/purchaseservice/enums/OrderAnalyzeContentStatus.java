@@ -1,0 +1,15 @@
+package com.moj.purchaseservice.enums;
+
+public enum OrderAnalyzeContentStatus {
+    PENDING,
+    PAYMENT_FAILED,
+    SERVER_FAILED,
+    PURCHASED,
+    FAIL_TO_SCRAPE,
+    SCRAPING_COMPLETED,
+    FAILED_TO_REFUND,
+    REFUND_COMPLETED,
+    ANALYZE_CONTENT_COMPLETED,
+    ANALYZE_CONTENT_FAILED,
+    SUCCEED,
+}

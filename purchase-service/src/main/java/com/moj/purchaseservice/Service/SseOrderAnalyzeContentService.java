@@ -3,7 +3,8 @@ package com.moj.purchaseservice.Service;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
 import com.moj.purchaseservice.Response.OrderResponse;
-import com.moj.purchaseservice.enums.OrderAnalyzeVideoStatus;
+import com.moj.purchaseservice.enums.OrderAnalyzeContentStatus;
+import com.moj.purchaseservice.enums.OrderStatus;
 import com.moj.purchaseservice.enums.Status;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -66,10 +67,29 @@ public class SseOrderAnalyzeContentService {
 
         return emitter;
     }
-    // when the listenr get the message from the user-service it update the user aswell
-    public void sendFinalStatus(Long orderId, OrderResponse response) {
+    public void sendPurchaseStatus(OrderResponse response) {
+        SseEmitter emitter = emitters.get(response.getOrderId());
+        if (emitter == null) {
+            return;
+        }
+        try {
+            emitter.send(
+                    SseEmitter.event()
+                            .id(response.getOrderId().toString())
+                            .name("order-analyze-content-purchase-status")
+                            .data(response)
+            );
+        } catch (IOException | IllegalStateException exception) {
+            emitters.remove(response.getOrderId(), emitter);
+            emitter.completeWithError(exception);
+        }
+    }
 
-        SseEmitter emitter = emitters.remove(orderId);
+
+    // when the listenr get the message from the user-service it update the user aswell
+    public void sendFinalStatus(OrderResponse response) {
+
+        SseEmitter emitter = emitters.remove(response.getOrderId());
 
         if (emitter == null) {
             return;
@@ -78,7 +98,7 @@ public class SseOrderAnalyzeContentService {
         try {
             emitter.send(
                     SseEmitter.event()
-                            .id(orderId.toString())
+                            .id(response.getOrderId().toString())
                             .name("analyze-content-status")
                             .data(response)
             );
@@ -113,14 +133,14 @@ public class SseOrderAnalyzeContentService {
 
         SseEmitter emitter = orderAnalyzeStatusSse(orderId);
 
-        if (order.getStatus() == OrderAnalyzeVideoStatus.PURCHASED) {
+        if (order.getStatus().equals(OrderAnalyzeContentStatus.SUCCEED)) {
             // checking if already got the message from user service
             OrderResponse response = OrderResponse.builder()
                     .orderId(orderId)
                     .status(Status.SUCCEED)
                     .message("Order Analyze Content succeeded")
                     .build();            // sending it to the front
-            sendFinalStatus(orderId, response);
+            sendFinalStatus(response);
         }
 
         return emitter;

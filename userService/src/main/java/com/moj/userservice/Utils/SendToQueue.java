@@ -2,31 +2,30 @@ package com.moj.userservice.Utils;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
 import com.moj.userservice.Dto.OrderCreditDto;
-import com.moj.userservice.Enums.AnalyzeOrderStatus;
 import com.moj.userservice.Enums.OrderStatus;
 import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
 import com.moj.userservice.Response.OrderCreditResponse;
 import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
-import com.moj.userservice.Response.PurchaseWithCreditResponse;
+import com.moj.userservice.Response.OrderAnalyzeContentStatusResponse;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SendToQueue {
-    private RabbitTemplate rabbitTemplate;
+    private final RabbitTemplate rabbitTemplate;
     public SendToQueue(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
     }
-    public void sendOrderStatus(Long orderId, AnalyzeOrderStatus analyzeOrderStatus) {
-        PurchaseWithCreditResponse response =
-                PurchaseWithCreditResponse.builder()
+    public void sendOrderAnalyzeContentStatus(Long orderId, OrderStatus status) {
+        OrderAnalyzeContentStatusResponse response =
+                OrderAnalyzeContentStatusResponse.builder()
                         .orderId(orderId)
-                        .analyzeOrderStatus(analyzeOrderStatus)
+                        .status(status)
                         .build();
 
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE,
-                RabbitMqConfig.ORDER_ANALYZE_CONTENT_ROUTING_KEY,
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_QUEUE,
                 response
         );
     }

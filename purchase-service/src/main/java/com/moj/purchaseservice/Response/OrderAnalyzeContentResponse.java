@@ -1,6 +1,6 @@
 package com.moj.purchaseservice.Response;
 
-import com.moj.purchaseservice.enums.ContentType;
+import com.moj.purchaseservice.enums.Platform;
 import com.moj.purchaseservice.enums.SumOfContent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,10 +13,10 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class OrderAnalyzeResponse {
+public class OrderAnalyzeContentResponse {
     private Long orderId;
     private Long creditCost;
     private SumOfContent sumOfContent;
-    private ContentType contentType;
+    private Platform platform;
     private UUID userId;
 }

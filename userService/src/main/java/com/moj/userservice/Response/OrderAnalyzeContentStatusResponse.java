@@ -1,6 +1,6 @@
 package com.moj.userservice.Response;
 
-import com.moj.userservice.Enums.AnalyzeOrderStatus;
+import com.moj.userservice.Enums.OrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class PurchaseWithCreditResponse {
+public class OrderAnalyzeContentStatusResponse {
     private Long orderId;
-    private AnalyzeOrderStatus analyzeOrderStatus;
+    private OrderStatus status;
 }

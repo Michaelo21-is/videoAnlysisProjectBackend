@@ -1,6 +1,6 @@
 package com.moj.userservice.Dto;
 
-import com.moj.userservice.Enums.ContentType;
+import com.moj.userservice.Enums.Platform;
 import com.moj.userservice.Enums.SumOfContent;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,5 +16,5 @@ public class OrderAnalyzeDto {
     private UUID userId;
     private Long creditCost;
     private SumOfContent sumOfContent;
-    private ContentType contentType;
+    private Platform platform;
 }

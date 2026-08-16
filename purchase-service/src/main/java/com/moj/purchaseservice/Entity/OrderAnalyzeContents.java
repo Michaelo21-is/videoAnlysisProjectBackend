@@ -1,6 +1,7 @@
 package com.moj.purchaseservice.Entity;
 
-import com.moj.purchaseservice.enums.OrderAnalyzeVideoStatus;
+import com.moj.purchaseservice.enums.OrderAnalyzeContentStatus;
+import com.moj.purchaseservice.enums.OrderStatus;
 import com.moj.purchaseservice.enums.Platform;
 import com.moj.purchaseservice.enums.SumOfContent;
 import jakarta.persistence.*;
@@ -52,5 +53,5 @@ public class OrderAnalyzeContents {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrderAnalyzeVideoStatus status;
+    private OrderAnalyzeContentStatus status;
 }

@@ -4,7 +4,7 @@ import com.moj.userservice.Configuartion.RabbitMqConfig;
 import com.moj.userservice.Dto.*;
 import com.moj.userservice.Entity.BusinessContext;
 import com.moj.userservice.Entity.Users;
-import com.moj.userservice.Enums.AnalyzeOrderStatus;
+import com.moj.userservice.Enums.OrderAnalyzeContentStatus;
 import com.moj.userservice.Enums.OrderStatus;
 import com.moj.userservice.Repository.BusinessContextRepository;
 import com.moj.userservice.Repository.UserRepository;
@@ -121,17 +121,17 @@ public class UserService {
     /// ***
 
     ///
-    /// analyze content
+    /// order analyze content
     ///
     @Transactional
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_QUEUE)
     public void handleOrderAnalyzeContent(OrderAnalyzeDto orderAnalyzeDto) {
 
-        if (orderAnalyzeDto == null || orderAnalyzeDto.getUserId() == null || orderAnalyzeDto.getCreditCost() == null) {
-            log.info("Order analyze content is null");
-            sendToQueue.sendOrderStatus(
-                    orderAnalyzeDto != null ? orderAnalyzeDto.getOrderId() : null,
-                    AnalyzeOrderStatus.SERVER_FAILED
+        if (orderAnalyzeDto.getUserId() == null || orderAnalyzeDto.getCreditCost() == null || orderAnalyzeDto.getOrderId() == null) {
+            log.info("check the parameters:  userId: {}, creditCost: {}, orderId: {}", orderAnalyzeDto.getUserId(), orderAnalyzeDto.getCreditCost(), orderAnalyzeDto.getOrderId());
+            sendToQueue.sendOrderAnalyzeContentStatus(
+                    orderAnalyzeDto.getOrderId(),
+                    OrderStatus.SERVER_FAILED
             );
             return;
         }
@@ -141,18 +141,18 @@ public class UserService {
 
         if (user == null) {
             log.info("User not found in handle order analyze content");
-            sendToQueue.sendOrderStatus(
+            sendToQueue.sendOrderAnalyzeContentStatus(
                     orderAnalyzeDto.getOrderId(),
-                    AnalyzeOrderStatus.SERVER_FAILED
+                    OrderStatus.SERVER_FAILED
             );
             return;
         }
 
         if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeDto.getCreditCost()) {
             log.info("User has no enough credit");
-            sendToQueue.sendOrderStatus(
+            sendToQueue.sendOrderAnalyzeContentStatus(
                     orderAnalyzeDto.getOrderId(),
-                    AnalyzeOrderStatus.PAYMENT_FAILED
+                    OrderStatus.PAYMENT_FAILED
             );
             return;
         }
@@ -160,17 +160,17 @@ public class UserService {
         long updatedCreditSum = user.getCreditSum() - orderAnalyzeDto.getCreditCost();
         if (updatedCreditSum < 0) {
             log.info("Credit sum is less than 0");
-            sendToQueue.sendOrderStatus(
+            sendToQueue.sendOrderAnalyzeContentStatus(
                     orderAnalyzeDto.getOrderId(),
-                    AnalyzeOrderStatus.PAYMENT_FAILED
+                    OrderStatus.PAYMENT_FAILED
             );
         }
         user.setCreditSum(updatedCreditSum);
         userRepository.save(user);
 
-        sendToQueue.sendOrderStatus(
+        sendToQueue.sendOrderAnalyzeContentStatus(
                 orderAnalyzeDto.getOrderId(),
-                AnalyzeOrderStatus.SUCCEED
+                OrderStatus.SUCCEED
         );
     }
     /// ***
@@ -219,7 +219,7 @@ public class UserService {
         if (orderAnalyzeVideoDto.getUserId() == null || orderAnalyzeVideoDto.getCreditCost() == null || orderAnalyzeVideoDto.getOrderId() == null) {
             log.info("some of the parameters are null in handle order analyze video: \n {}", orderAnalyzeVideoDto);
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderStatus.SERVER_FAILED)
+                    .status(OrderAnalyzeContentStatus.SERVER_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -229,7 +229,7 @@ public class UserService {
         if (user == null) {
             log.info("User not found with the id");
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderStatus.SERVER_FAILED)
+                    .status(OrderAnalyzeContentStatus.SERVER_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -237,7 +237,7 @@ public class UserService {
         if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeVideoDto.getCreditCost()) {
             log.info("something went wrong in purchase should not pass 0 credit or less than credit cost");
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderStatus.PAYMENT_FAILED)
+                    .status(OrderAnalyzeContentStatus.PAYMENT_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -246,7 +246,7 @@ public class UserService {
         if (updatedCreditSum < 0) {
             log.info("not enough credit to purchase analyze video");
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                    .status(OrderStatus.PAYMENT_FAILED)
+                    .status(OrderAnalyzeContentStatus.PAYMENT_FAILED)
                     .build();
             sendToQueue.sendOrderAnalyzeStatus(response);
             return;
@@ -254,7 +254,7 @@ public class UserService {
         user.setCreditSum(updatedCreditSum);
         userRepository.save(user);
         OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
-                .status(OrderStatus.PURCHASED)
+                .status(OrderAnalyzeContentStatus.PURCHASED)
                 .orderId(orderAnalyzeVideoDto.getOrderId())
                 .build();
         sendToQueue.sendOrderAnalyzeStatus(response);

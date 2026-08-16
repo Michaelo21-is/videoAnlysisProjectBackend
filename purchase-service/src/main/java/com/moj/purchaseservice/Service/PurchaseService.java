@@ -70,23 +70,22 @@ public class PurchaseService {
     /// ***
     public Long orderAnalyzeContent(UUID userId, OrderAnalyzeContentDto orderAnalyzeContentDto) {
 
-        Long creditCost = contentPricingCalculator.calculatePricingByNumOfContents(sumOfContent);
+        Long creditCost = contentPricingCalculator.calculatePricingByNumOfContents(orderAnalyzeContentDto.getSumOfContent());
 
         OrderAnalyzeContents orderAnalyzeContents = OrderAnalyzeContents.builder()
                 .userId(userId)
-                .status(OrderAnalyzeVideoStatus.PENDING)
-                .sumOfContent(creditCost)
-                .contentType(contentType)
-                .creditCost(credit)
+                .status(OrderAnalyzeContentStatus.PENDING)
+                .sumOfContent(orderAnalyzeContentDto.getSumOfContent())
+                .creditCost(creditCost)
                 .build();
 
         orderAnalyzeContentRepository.save(orderAnalyzeContents);
 
-        OrderAnalyzeResponse response = OrderAnalyzeResponse.builder()
+        OrderAnalyzeContentResponse response = OrderAnalyzeContentResponse.builder()
                 .orderId(orderAnalyzeContents.getId())
-                .creditCost(credit)
-                .sumOfContent(sumOfContent)
-                .contentType(contentType)
+                .creditCost(creditCost)
+                .sumOfContent(orderAnalyzeContentDto.getSumOfContent())
+                .platform(orderAnalyzeContentDto.getPlatform())
                 .userId(userId)
                 .build();
 
@@ -98,6 +97,33 @@ public class PurchaseService {
 
         return orderAnalyzeContents.getId();
     }
+    @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
+    public void analyzeContentStatus(OrderAnalyzeContentStatusDto orderAnalyzeContentStatusDto) {
+        if (orderAnalyzeContentStatusDto.getStatus() == null || orderAnalyzeContentStatusDto.getOrderId() == null) {
+            log.error("some of the parameters are null in order analyze content status queue,\n" +
+                    " order id: {}, status: {}", orderAnalyzeContentStatusDto.getOrderId(), orderAnalyzeContentStatusDto.getStatus());
+            return;
+        }
+        OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(orderAnalyzeContentStatusDto.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        order.setStatus(orderAnalyzeContentStatusDto.getStatus());
+        orderAnalyzeContentRepository.save(order);
+        if (order.getStatus().equals(OrderAnalyzeContentStatus.PURCHASED)) {
+            sseOrderAnalyzeContentService.sendPurchaseStatus(OrderResponse.builder()
+                    .status(Status.SUCCEED)
+                    .orderId(orderAnalyzeContentStatusDto.getOrderId())
+                    .message("Order analyze content purchased successfully")
+                    .build());
+        }
+        else{
+            sseOrderAnalyzeContentService.sendFinalStatus(OrderResponse.builder()
+                    .status(Status.PAYMENT_FAILED)
+                    .orderId(orderAnalyzeContentStatusDto.getOrderId())
+                    .message("Not enough credits in your account")
+                    .build());
+        }
+    }
+
     ///
     /// order analyze content
     ///
@@ -406,15 +432,12 @@ public class PurchaseService {
 
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_STATUS_QUEUE)
     public void orderAnalyzeVideoStatus(OrderAnalyzeVideoStatusDto orderStatusDto) {
-
-
         if (orderStatusDto.getStatus() == null) {
             return;
         }
-
-        OrderAnalyzeVideo order =
-                orderAnalyzeVideoRepository.findById(orderStatusDto.getOrderId())
-                        .orElseThrow(() -> new RuntimeException("Order not found"));
+        if (!orderAnalyzeVideoRepository.existsById(orderStatusDto.getOrderId())){
+            log.warn("order analyze video status is not found in order analyze video status queue order id: \n {} ", orderStatusDto.getOrderId());
+        }
 
         switch (orderStatusDto.getStatus()) {
 
