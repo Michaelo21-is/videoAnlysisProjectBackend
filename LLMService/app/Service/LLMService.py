@@ -1,7 +1,10 @@
-from app.Config.ApifyConfig import get_tiktok_video_with_url, get_instagram_video_with_url, get_facebook_video_with_url, get_x_video_with_url
-from app.Config.RabitMqConfig import rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_ROUTING_KEY, SCRAPING_FINISHED_ROUTING_KEY
+from app.Config.ApifyConfigAnalyzeVideo import get_tiktok_video_with_url, get_instagram_video_with_url, get_facebook_video_with_url, get_x_video_with_url
+from app.Config.ApifyConfigAnalyzeContent import search_youtube_videos, search_x_videos, search_tiktok_videos , search_instagram_videos, search_facebook_videos
+from app.Config.RabitMqConfig import (rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_ROUTING_KEY
+, SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY, ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY)
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, Platform
 from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini
 from app.Util.CheckUrlPlatform import check_url_platform, Platform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
@@ -14,7 +17,7 @@ logger = logging.getLogger(__name__)
 class LLMService:
     def __init__(self):
         self.diagram_service = DiagramService()
-    async def analyze_video( self, analyze_video_schema: AnalyzeVideoSchema) -> None:
+    async def analyze_video( self, analyze_video_schema: AnalyzeVideoSchema,) -> None:
         logger.info(f"Received analyze video request: {analyze_video_schema}")
         # 1. לא התקבל שום מקור וידאו
         if (analyze_video_schema.video_url is None and
@@ -53,7 +56,7 @@ class LLMService:
 
                 await rabbitmq_manager.publish(
                     payload=scraping_response,
-                    routing_key=SCRAPING_FINISHED_ROUTING_KEY,
+                    routing_key=SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY,
                 )
                 return
 
@@ -105,7 +108,7 @@ class LLMService:
 
                 await rabbitmq_manager.publish(
                     payload=scraping_response,
-                    routing_key=SCRAPING_FINISHED_ROUTING_KEY,
+                    routing_key=SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY,
                 )
                 return
 
@@ -118,7 +121,7 @@ class LLMService:
 
             await rabbitmq_manager.publish(
                 payload=scraping_response,
-                routing_key=SCRAPING_FINISHED_ROUTING_KEY,
+                routing_key=SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY,
             )
 
             prompt = build_video_url_analysis_prompt(
@@ -232,3 +235,54 @@ class LLMService:
             )
 
             return
+    async def analyze_content_scrape_video(self, analyze_content_scrape: AnalyzeContentScrape, ) -> None:
+        if analyze_content_scrape.order_id is None or analyze_content_scrape.platform is None or analyze_content_scrape.sum_of_content is None or analyze_content_scrape.user_id is None:
+            logger.error("some thing went missing pls check the variables:\n %s", analyze_content_scrape)
+
+            await  rabbitmq_manager.publish(
+
+                routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY
+            )
+        try:
+            if analyze_content_scrape.platform == Platform.YOUTUBE:
+                video_details = search_youtube_videos(analyze_content_scrape.niche)
+                if video_details is None:
+                    logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    await rabbitmq_manager.publish(
+                        routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                    )
+            elif analyze_content_scrape.platform == Platform.X:
+                video_details = search_x_videos(analyze_content_scrape.niche)
+                if video_details is None:
+                    logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    await rabbitmq_manager.publish(
+
+                        routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                    )
+            elif analyze_content_scrape.platform == Platform.TIKTOK:
+                video_details = search_tiktok_videos(analyze_content_scrape.niche)
+                if video_details is None:
+                    logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    await rabbitmq_manager.publish(
+
+                        routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                    )
+            elif analyze_content_scrape.platform == Platform.FACEBOOK:
+                video_details = search_facebook_videos(analyze_content_scrape.niche)
+                if video_details is None:
+                    logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    await rabbitmq_manager.publish(
+
+                        routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                    )
+            elif analyze_content_scrape.platform == Platform.INSTAGRAM:
+                video_details = search_instagram_videos(analyze_content_scrape.niche)
+                if video_details is None:
+                    logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    await rabbitmq_manager.publish(
+
+                        routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                    )
+            # saving the video deatils into redis and return video deatils to the purchase service
+
+

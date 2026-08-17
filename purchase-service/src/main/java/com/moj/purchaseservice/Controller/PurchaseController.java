@@ -1,5 +1,6 @@
 package com.moj.purchaseservice.Controller;
 
+import com.moj.purchaseservice.Dto.OrderAnalyzeContentDto;
 import com.moj.purchaseservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
 import com.moj.purchaseservice.Response.CheckOrderAnalyzeVideoStatusResponse;
@@ -55,9 +56,8 @@ public class PurchaseController {
         return ResponseEntity.ok().build();
     }
     @PostMapping("/analyze-content-request")
-    public ResponseEntity<?> analyzeContent(@RequestHeader("X-USER-ID") UUID userId
-            , @RequestParam("amount") SumOfContent sumOfContent, @RequestParam("contentType") ContentType contentType) {
-        Long orderId = purchaseService.orderAnalyzeContent(userId, sumOfContent, contentType);
+    public ResponseEntity<?> analyzeContent(@RequestHeader("X-USER-ID") UUID userId, @RequestBody OrderAnalyzeContentDto order) {
+        Long orderId = purchaseService.orderAnalyzeContent(userId, order);
         return ResponseEntity.accepted().body(orderId);
     }
     @GetMapping(value = "/analyze-content/status/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

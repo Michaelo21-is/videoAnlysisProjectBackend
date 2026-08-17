@@ -8,6 +8,7 @@ import com.moj.userservice.Enums.OrderAnalyzeContentStatus;
 import com.moj.userservice.Enums.OrderStatus;
 import com.moj.userservice.Repository.BusinessContextRepository;
 import com.moj.userservice.Repository.UserRepository;
+import com.moj.userservice.Response.OrderAnalyzeContentScrapeResponse;
 import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
 import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
 import com.moj.userservice.Response.UserDetailsResponse;
@@ -125,53 +126,56 @@ public class UserService {
     ///
     @Transactional
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_QUEUE)
-    public void handleOrderAnalyzeContent(OrderAnalyzeDto orderAnalyzeDto) {
+    public void handleOrderAnalyzeContent(OrderAnalyzeContentDto orderAnalyzeContentDto) {
 
-        if (orderAnalyzeDto.getUserId() == null || orderAnalyzeDto.getCreditCost() == null || orderAnalyzeDto.getOrderId() == null) {
-            log.info("check the parameters:  userId: {}, creditCost: {}, orderId: {}", orderAnalyzeDto.getUserId(), orderAnalyzeDto.getCreditCost(), orderAnalyzeDto.getOrderId());
+        if (orderAnalyzeContentDto.getUserId() == null || orderAnalyzeContentDto.getCreditCost() == null || orderAnalyzeContentDto.getOrderId() == null) {
+            log.info("check the parameters:  userId: {}, creditCost: {}, orderId: {}", orderAnalyzeContentDto.getUserId(), orderAnalyzeContentDto.getCreditCost(), orderAnalyzeContentDto.getOrderId());
             sendToQueue.sendOrderAnalyzeContentStatus(
-                    orderAnalyzeDto.getOrderId(),
+                    orderAnalyzeContentDto.getOrderId(),
                     OrderStatus.SERVER_FAILED
             );
             return;
         }
 
-        Users user = userRepository.findById(orderAnalyzeDto.getUserId())
+        Users user = userRepository.findById(orderAnalyzeContentDto.getUserId())
                 .orElse(null);
 
         if (user == null) {
             log.info("User not found in handle order analyze content");
             sendToQueue.sendOrderAnalyzeContentStatus(
-                    orderAnalyzeDto.getOrderId(),
+                    orderAnalyzeContentDto.getOrderId(),
                     OrderStatus.SERVER_FAILED
             );
             return;
         }
 
-        if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeDto.getCreditCost()) {
+        if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeContentDto.getCreditCost()) {
             log.info("User has no enough credit");
             sendToQueue.sendOrderAnalyzeContentStatus(
-                    orderAnalyzeDto.getOrderId(),
+                    orderAnalyzeContentDto.getOrderId(),
                     OrderStatus.PAYMENT_FAILED
             );
             return;
         }
 
-        long updatedCreditSum = user.getCreditSum() - orderAnalyzeDto.getCreditCost();
+        long updatedCreditSum = user.getCreditSum() - orderAnalyzeContentDto.getCreditCost();
         if (updatedCreditSum < 0) {
             log.info("Credit sum is less than 0");
             sendToQueue.sendOrderAnalyzeContentStatus(
-                    orderAnalyzeDto.getOrderId(),
+                    orderAnalyzeContentDto.getOrderId(),
                     OrderStatus.PAYMENT_FAILED
             );
         }
         user.setCreditSum(updatedCreditSum);
         userRepository.save(user);
 
-        sendToQueue.sendOrderAnalyzeContentStatus(
-                orderAnalyzeDto.getOrderId(),
-                OrderStatus.SUCCEED
-        );
+        sendToQueue.sendOrderAnalyzeContentStatus(orderAnalyzeContentDto.getOrderId(), OrderStatus.SUCCEED);
+        sendToQueue.sendOrderAnalyzeContentToScrape(OrderAnalyzeContentScrapeResponse.builder()
+                .sumOfContent(orderAnalyzeContentDto.getSumOfContent())
+                .orderId(orderAnalyzeContentDto.getOrderId())
+                .platform(orderAnalyzeContentDto.getPlatform())
+                .niche(orderAnalyzeContentDto.getNiche())
+                .build());
     }
     /// ***
     /// analyze content

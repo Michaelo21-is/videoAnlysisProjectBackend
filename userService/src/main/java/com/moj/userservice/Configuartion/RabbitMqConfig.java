@@ -16,12 +16,16 @@ public class RabbitMqConfig {
     public static final String ORDER_ANALYZE_CONTENT_QUEUE = "order-analyze-content-queue";
 
     public static final String ORDER_ANALYZE_CONTENT_EXCHANGE = "order-analyze-content-exchange";
-    public static final String ORDER_ANALYZE_CONTENT_ROUTING_KEY = "order-analyze-content.status-routing-key";
+
+    public static final String ORDER_ANALYZE_CONTENT_STATUS_KEY = "order.analyze-content.status.routing-key";
     public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE = "order-analyze-content-status-queue";
+
+    public static final String ORDER_ANALYZE_CONTENT_SCRAPE_QUEUE = "order-analyze-content-scrape-queue";
+    public static final String ORDER_ANALYZE_CONTENT_SCRAPE_ROUTING_KEY = "order_analyze_content.scrape.routing-key";
 
     public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
     public static final String ORDER_CREDIT_STATUS_EXCHANGE = "order-credit-status-exchange";
-    public static final String ORDER_CREDIT_STATUS_ROUTING_KEY = "order-credit-analyzeOrderStatus-routing-key";
+    public static final String ORDER_CREDIT_STATUS_ROUTING_KEY = "order_credit.analyzeOrderStatus.routing-key";
 
 
     public static final String ORDER_ANALYZE_VIDEO_QUEUE = "order-analyze-video-queue";
@@ -125,7 +129,19 @@ public class RabbitMqConfig {
         return BindingBuilder
                 .bind(orderAnalyzeContentStatusQueue)
                 .to(orderAnalyzeContentStatusExchange)
-                .with(ORDER_ANALYZE_CONTENT_ROUTING_KEY);
+                .with(ORDER_ANALYZE_CONTENT_STATUS_KEY);
+    }
+    @Bean Queue orderAnalyzeContentScrapQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_SCRAPE_QUEUE)
+                .build();
+    }
+    @Bean
+    public Binding orderAnalyzeContentScrapBinding(@Qualifier("orderAnalyzeContentScrapQueue") Queue orderAnalyzeContentScrapQueue, @Qualifier("orderAnalyzeContentStatusExchange") DirectExchange orderAnalyzeContentStatusExchange) {
+        return BindingBuilder
+                .bind(orderAnalyzeContentScrapQueue)
+                .to(orderAnalyzeContentStatusExchange)
+                .with(ORDER_ANALYZE_CONTENT_SCRAPE_ROUTING_KEY);
     }
 
     @Bean

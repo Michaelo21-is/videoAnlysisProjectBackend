@@ -87,6 +87,7 @@ public class PurchaseService {
                 .sumOfContent(orderAnalyzeContentDto.getSumOfContent())
                 .platform(orderAnalyzeContentDto.getPlatform())
                 .userId(userId)
+                .niche(orderAnalyzeContentDto.getNiche())
                 .build();
 
         rabbitTemplate.convertAndSend(

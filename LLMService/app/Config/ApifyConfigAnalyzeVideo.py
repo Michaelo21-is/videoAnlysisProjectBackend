@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 
-from app.Util.ExtractVideoUrlFromApify import (
+from app.Util.ExtractVideoUrlFromApifyVideoAnalyzer import (
     extract_instagram_reel_media,
     extract_tiktok_media,
     extract_X_video_media,

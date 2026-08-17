@@ -1,12 +1,10 @@
 package com.moj.userservice.Utils;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
+import com.moj.userservice.Dto.OrderAnalyzeContentDto;
 import com.moj.userservice.Dto.OrderCreditDto;
 import com.moj.userservice.Enums.OrderStatus;
-import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
-import com.moj.userservice.Response.OrderCreditResponse;
-import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
-import com.moj.userservice.Response.OrderAnalyzeContentStatusResponse;
+import com.moj.userservice.Response.*;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +23,14 @@ public class SendToQueue {
 
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE,
-                RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_QUEUE,
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_KEY,
+                response
+        );
+    }
+    public void sendOrderAnalyzeContentToScrape(OrderAnalyzeContentScrapeResponse response) {
+        rabbitTemplate.convertAndSend(
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE,
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_SCRAPE_ROUTING_KEY,
                 response
         );
     }
