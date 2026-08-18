@@ -3,6 +3,7 @@ package com.moj.purchaseservice.Controller;
 import com.moj.purchaseservice.Dto.OrderAnalyzeContentDto;
 import com.moj.purchaseservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
+import com.moj.purchaseservice.Response.CheckOrderAnalyzeContentStatusResponse;
 import com.moj.purchaseservice.Response.CheckOrderAnalyzeVideoStatusResponse;
 import com.moj.purchaseservice.Service.*;
 import com.moj.purchaseservice.enums.SumOfContent;
@@ -59,6 +60,11 @@ public class PurchaseController {
     public ResponseEntity<?> analyzeContent(@RequestHeader("X-USER-ID") UUID userId, @RequestBody OrderAnalyzeContentDto order) {
         Long orderId = purchaseService.orderAnalyzeContent(userId, order);
         return ResponseEntity.accepted().body(orderId);
+    }
+    @GetMapping("/check-order-analyze-content-id")
+    public ResponseEntity<?> checkOrderAnalyzeContentId(@RequestHeader("X-USER-ID") UUID userId, @RequestParam("orderId") Long orderId) {
+        CheckOrderAnalyzeContentStatusResponse response = purchaseService.checkOrderAnalyzeContentStatus(userId, orderId);
+        return ResponseEntity.ok(response);
     }
     @GetMapping(value = "/analyze-content/status/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter getAnalyzeContentStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {

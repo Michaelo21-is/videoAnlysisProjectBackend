@@ -19,6 +19,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -97,6 +98,55 @@ public class PurchaseService {
         );
 
         return orderAnalyzeContents.getId();
+    }
+    public CheckOrderAnalyzeContentStatusResponse checkOrderAnalyzeContentStatus(UUID userId ,Long orderId) {
+        if (userId == null || orderId == null) {
+            log.error("userId or orderId is null in check order analyze content status, order id: {}, user id: {}", orderId, userId);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Didn't get the required details");
+        }
+        OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        if (!order.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to access this order");
+        }
+        switch (order.getStatus()) {
+            case PURCHASED -> {
+                return CheckOrderAnalyzeContentStatusResponse.builder()
+                        .message("Order analyze content purchased successfully")
+                        .status(OrderAnalyzeContentStatusResponse.PURCHASED)
+                        .build();
+            }
+            case SCRAPING_COMPLETED -> {
+                return CheckOrderAnalyzeContentStatusResponse.builder()
+                        .message("Order analyze content scraping completed successfully")
+                        .status(OrderAnalyzeContentStatusResponse.SCRAPING_COMPLETED)
+                        .build();
+            }
+            case PICKUP_VIDEOS_COMPLETED -> {
+                return CheckOrderAnalyzeContentStatusResponse.builder()
+                        .message("Order analyze content scraping completed successfully")
+                        .status(OrderAnalyzeContentStatusResponse.PICKUP_VIDEOS_COMPLETED)
+                        .build();
+            }
+            case ANALYZE_CONTENT_COMPLETED -> {
+                return CheckOrderAnalyzeContentStatusResponse.builder()
+                        .message("Order analyze content scraping completed successfully")
+                        .status(OrderAnalyzeContentStatusResponse.ANALYZING_VIDEOS_COMPLETED)
+                        .build();
+            }
+            case SUCCEED -> {
+                return CheckOrderAnalyzeContentStatusResponse.builder()
+                        .message("complete analyze content successfully")
+                        .status(OrderAnalyzeContentStatusResponse.GENERATING_RESPONSE)
+                        .build();
+            }
+            default -> {
+                return CheckOrderAnalyzeContentStatusResponse.builder()
+                        .message("failed to analyze content please try again later.")
+                        .status(OrderAnalyzeContentStatusResponse.FAILED)
+                        .build();
+            }
+        }
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
     public void analyzeContentStatus(OrderAnalyzeContentStatusDto orderAnalyzeContentStatusDto) {
@@ -400,10 +450,7 @@ public class PurchaseService {
                                 "Order not found"
                         ));
 
-        log.info(
-                "received request to check order analyze video status for order info: {} ",
-                order
-        );
+        log.info("received request to check order analyze video status for order info: {} ", order);
 
         if (!order.getUserId().equals(userId)) {
             throw new ResponseStatusException(
