@@ -5,6 +5,7 @@ from app.Util.ExtractVideoDetailsFromApify import (extractedVideoDetailsFromTikt
    extractedVideoDetailsFromYoutube)
 api_key = os.environ["APIFY_API"]
 client = ApifyClient(api_key)
+from app.Schemea.AnalyzeContentSchema import ExtractedVideoDetails
 
 def get_first_dataset_item(result) -> dict:
     dataset_id = result.default_dataset_id
@@ -13,7 +14,7 @@ def get_first_dataset_item(result) -> dict:
     if item is None:
         raise ValueError("Apify did not return any dataset items")
     return item
-def search_tiktok_videos(niche: str) -> list[dict]:
+def search_tiktok_videos(niche: str) -> list[ExtractedVideoDetails]:
     run_input = {
         "hashtags": None,
         "profiles": None,
@@ -57,7 +58,7 @@ def search_tiktok_videos(niche: str) -> list[dict]:
 
     return videos
 
-def search_instagram_videos(niche: str) -> list[dict]:
+def search_instagram_videos(niche: str) -> list[ExtractedVideoDetails]:
     run_input = {
         "resultsType": "details",
         "directUrls": None,
@@ -81,7 +82,7 @@ def search_instagram_videos(niche: str) -> list[dict]:
 
     return videos
 
-def search_x_videos(niche: str) -> list[dict]:
+def search_x_videos(niche: str) -> list[ExtractedVideoDetails]:
     run_input = {
         "startUrls": None,
         "twitterHandles": None,
@@ -135,7 +136,7 @@ def search_facebook_videos(niche: str) -> list[dict]:
         videos.append(video_details)
     return videos
 
-def search_youtube_videos(niche: str)-> list[dict]:
+def search_youtube_videos(niche: str)-> list[ExtractedVideoDetails]:
     run_input = {
         "searchQueries": [niche],
 

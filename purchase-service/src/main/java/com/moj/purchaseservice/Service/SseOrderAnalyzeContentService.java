@@ -1,5 +1,6 @@
 package com.moj.purchaseservice.Service;
 
+import com.moj.purchaseservice.Dto.OderAnalyzeContentScrapingDto;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
 import com.moj.purchaseservice.Response.OrderResponse;
@@ -84,9 +85,26 @@ public class SseOrderAnalyzeContentService {
             emitter.completeWithError(exception);
         }
     }
+    public void sendScrapingStatus(OderAnalyzeContentScrapingDto response) {
+        SseEmitter emitter = emitters.get(response.getOrderId());
+        if (emitter == null){
+            return;
+        }
+        try {
+            emitter.send(
+                    SseEmitter.event()
+                            .id(response.getOrderId().toString())
+                            .name("order-analyze-content-scraping-status")
+                            .data(response)
+            );
+        } catch (IOException | IllegalStateException exception) {
+            emitters.remove(response.getOrderId(), emitter);
+            emitter.completeWithError(exception);
+        }
+    }
 
 
-    // when the listenr get the message from the user-service it update the user aswell
+    // if something in the process went wrong
     public void sendFinalStatus(OrderResponse response) {
 
         SseEmitter emitter = emitters.remove(response.getOrderId());

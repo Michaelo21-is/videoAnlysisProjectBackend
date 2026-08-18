@@ -16,11 +16,38 @@ class SumOfContent(str, Enum):
 
 class AnalyzeContentScrape(BaseModel):
     order_id: int = Field(alias="orderId")
-    platform: Platform = Field(alias="platform")
+    platform: Platform
     sum_of_content: SumOfContent = Field(alias="sumOfContent")
-    niche:str = Field(alias="niche")
+    niche: str
 
-class ScrapingCompletedResponse(BaseModel):
-    order_id: int
+class CreatorDetails(BaseModel):
+    name: str | None = None
+    profile_url: str | None = Field(default=None, alias="profileUrl")
+    avatar: str | None = None
+    followers: int = 0
+    is_verified: bool | None = Field(default=None, alias="isVerified")
+
+
+class ExtractedVideoDetails(BaseModel):
+    id: str | None = None
+    caption: str | None = None
+    url: str | None = None
+
+    views: int = 0
+    likes: int = 0
+    comments: int = 0
+    shares: int = 0
+
+    created_at: str | None = Field(default=None, alias="createdAt")
+    thumbnail: str | None = None
+
+    creator: CreatorDetails
+
+    duration: int | float | str | None = None
+
+
+class AnalyzeContentScrapeResponse(BaseModel):
+    order_id: int = Field(alias="orderId")
     message: str
     status: ScrapingStatus
+    videos: list[ExtractedVideoDetails] = []

@@ -124,6 +124,29 @@ public class PurchaseService {
                     .build());
         }
     }
+    @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_QUEUE)
+    public void analyzeContentScrapeResponse(OderAnalyzeContentScrapingDto orderAnalyzeContentScrapingDto) {
+        if (orderAnalyzeContentScrapingDto.getOrderId() == null) {
+            log.error("order id is null in order analyze content scrape response queue");
+            return;
+        }
+        OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(orderAnalyzeContentScrapingDto.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found in order analyze content scrape response queue"));
+        if (orderAnalyzeContentScrapingDto.getStatus().equals(ScrapingStatus.FAILED)) {
+            order.setStatus(OrderAnalyzeContentStatus.FAIL_TO_SCRAPE);
+            orderAnalyzeContentRepository.save(order);
+            sseOrderAnalyzeContentService.sendFinalStatus(OrderResponse.builder()
+                    .status(Status.SERVER_FAILED)
+                    .orderId(orderAnalyzeContentScrapingDto.getOrderId())
+                    .message("Failed to scrape content, please try again later")
+                    .build());
+        }
+        else{
+            order.setStatus(OrderAnalyzeContentStatus.SCRAPING_COMPLETED);
+            orderAnalyzeContentRepository.save(order);
+            sseOrderAnalyzeContentService.sendScrapingStatus(orderAnalyzeContentScrapingDto);
+        }
+    }
 
     ///
     /// order analyze content

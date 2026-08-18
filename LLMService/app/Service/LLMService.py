@@ -4,10 +4,11 @@ from app.Config.RabitMqConfig import (rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_R
 , SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY, ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY)
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
-from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, Platform
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, Platform, AnalyzeContentScrapeResponse
 from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini
 from app.Util.CheckUrlPlatform import check_url_platform, Platform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
+from app.Util.SelectReleventVideos import select_top_relevant_videos
 from app.Service.DiagramService import DiagramService
 import logging
 import asyncio
@@ -238,9 +239,13 @@ class LLMService:
     async def analyze_content_scrape_video(self, analyze_content_scrape: AnalyzeContentScrape, ) -> None:
         if analyze_content_scrape.order_id is None or analyze_content_scrape.platform is None or analyze_content_scrape.sum_of_content is None or analyze_content_scrape.user_id is None:
             logger.error("some thing went missing pls check the variables:\n %s", analyze_content_scrape)
-
+            response = AnalyzeContentScrapeResponse(
+                orderId=analyze_content_scrape.order_id,
+                status=AnalyzeContentScrapeResponse.FAILED,
+                message="some thing went missing pls check the variables:\n %s",
+            )
             await  rabbitmq_manager.publish(
-
+                response=response,
                 routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY
             )
         try:
@@ -248,41 +253,95 @@ class LLMService:
                 video_details = search_youtube_videos(analyze_content_scrape.niche)
                 if video_details is None:
                     logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    response = AnalyzeContentScrapeResponse(
+                        orderId=analyze_content_scrape.order_id,
+                        status=AnalyzeContentScrapeResponse.FAILED,
+                        message="No videos found for the given niche: %s",
+                    )
                     await rabbitmq_manager.publish(
+                        response=response,
                         routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
                     )
+                    return
             elif analyze_content_scrape.platform == Platform.X:
                 video_details = search_x_videos(analyze_content_scrape.niche)
                 if video_details is None:
                     logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    response = AnalyzeContentScrapeResponse(
+                        orderId=analyze_content_scrape.order_id,
+                        status=AnalyzeContentScrapeResponse.FAILED,
+                        message="No videos found for the given niche: %s",
+                    )
                     await rabbitmq_manager.publish(
-
+                        response=response,
                         routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
                     )
+                    return
             elif analyze_content_scrape.platform == Platform.TIKTOK:
                 video_details = search_tiktok_videos(analyze_content_scrape.niche)
                 if video_details is None:
                     logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    response = AnalyzeContentScrapeResponse(
+                        orderId=analyze_content_scrape.order_id,
+                        status=AnalyzeContentScrapeResponse.FAILED,
+                        message="No videos found for the given niche: %s",
+                    )
                     await rabbitmq_manager.publish(
-
+                        response=response,
                         routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
                     )
+                    return
             elif analyze_content_scrape.platform == Platform.FACEBOOK:
                 video_details = search_facebook_videos(analyze_content_scrape.niche)
                 if video_details is None:
                     logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    response = AnalyzeContentScrapeResponse(
+                        orderId=analyze_content_scrape.order_id,
+                        status=AnalyzeContentScrapeResponse.FAILED,
+                        message="No videos found for the given niche: %s",
+                    )
                     await rabbitmq_manager.publish(
-
+                        response=response,
                         routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
                     )
+                    return
             elif analyze_content_scrape.platform == Platform.INSTAGRAM:
                 video_details = search_instagram_videos(analyze_content_scrape.niche)
                 if video_details is None:
                     logger.error("No videos found for the given niche: %s", analyze_content_scrape.niche)
+                    response = AnalyzeContentScrapeResponse(
+                        orderId=analyze_content_scrape.order_id,
+                        status=AnalyzeContentScrapeResponse.FAILED,
+                        message="No videos found for the given niche: %s",
+                    )
                     await rabbitmq_manager.publish(
-
+                        response=response,
                         routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
                     )
+                    return
+            else:
+                logger.error("Invalid platform: %s", analyze_content_scrape.platform)
+                response = AnalyzeContentScrapeResponse(
+                    orderId=analyze_content_scrape.order_id,
+                    status=AnalyzeContentScrapeResponse.FAILED,
+                    message="Invalid platform: %s",
+                )
+                await rabbitmq_manager.publish(
+                    response=response,
+                    routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                )
+                return
+            relevant_video_details = select_top_relevant_videos(video_details)
+            response = AnalyzeContentScrapeResponse(
+                orderId=analyze_content_scrape.order_id,
+                status=ScrapingStatus.SUCCEED,
+                message="analyze content scrape video successfully",
+                videos=relevant_video_details,
+            )
+            await rabbitmq_manager.publish(
+                response=response,
+                routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+            )
             # saving the video deatils into redis and return video deatils to the purchase service
 
 
