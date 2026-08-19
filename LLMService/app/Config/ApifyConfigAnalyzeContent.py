@@ -16,15 +16,27 @@ def get_first_dataset_item(result) -> dict:
     return item
 def search_tiktok_videos(niche: str) -> list[ExtractedVideoDetails]:
     run_input = {
-        "hashtags": None,
-        "profiles": None,
-        "postURLs": None,
+        "hashtags": [],
+        "resultsPerPage": 50,
+
+        "profiles": [],
+        "profileScrapeSections": ["videos"],
+        "profileSorting": "latest",
+        "excludePinnedPosts": False,
 
         "searchQueries": [niche],
-        "resultsPerPage": 50,
+        "searchSection": "",
+        "maxProfilesPerQuery": 10,
 
         "videoSearchSorting": "MOST_RELEVANT",
         "videoSearchDateFilter": "ALL_TIME",
+
+        "scrapeRelatedSearchWords": False,
+
+        "postURLs": [],
+
+        "scrapeRelatedVideos": False,
+        "scrapeAdditionalAuthorMeta": False,
 
         "shouldDownloadVideos": False,
         "shouldDownloadCovers": False,
@@ -32,11 +44,14 @@ def search_tiktok_videos(niche: str) -> list[ExtractedVideoDetails]:
         "shouldDownloadAvatars": False,
         "shouldDownloadMusicCovers": False,
 
-        "scrapeRelatedVideos": False,
-        "scrapeAdditionalAuthorMeta": False,
+        "downloadSubtitlesOptions": "NEVER_DOWNLOAD_SUBTITLES",
+
+        "aiVideoDescription": False,
+        "aiVideoSummary": False,
 
         "commentsPerPost": 0,
         "topLevelCommentsPerPost": 0,
+        "maxRepliesPerComment": 0,
 
         "proxyCountryCode": "None",
     }
@@ -45,9 +60,21 @@ def search_tiktok_videos(niche: str) -> list[ExtractedVideoDetails]:
 
     videos = []
 
-    for item in client.dataset(
-        run["defaultDatasetId"]
-    ).iterate_items():
+    for item in client.dataset(run.default_dataset_id).iterate_items():
+
+        if item.get("errorCode"):
+            continue
+
+        video_details = extractedVideoDetailsFromTiktok(item)
+
+        videos.append(video_details)
+
+    return videos
+    run = client.actor("GdWCkxBtKWOsKjdch").call(run_input=run_input)
+
+    videos = []
+
+    for item in client.dataset(run.default_dataset_id).iterate_items():
 
         if item.get("errorCode"):
             continue
@@ -72,7 +99,7 @@ def search_instagram_videos(niche: str) -> list[ExtractedVideoDetails]:
     run = client.actor("shu8hvrXbJbY3Eb9W").call(run_input=run_input)
     videos = []
 
-    for item in client.dataset( run["defaultDatasetId"]).iterate_items():
+    for item in client.dataset(run.default_dataset_id).iterate_items():
         if item.get("error"):
             continue
 
@@ -115,7 +142,9 @@ def search_x_videos(niche: str) -> list[ExtractedVideoDetails]:
     }
     run = client.actor("61RPP7dywgiy0JPD0").call(run_input=run_input)
     videos = []
-    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+    for item in client.dataset(run.default_dataset_id).iterate_items():
+        if item.get("error"):
+            continue
         video_details = extractedVideoDetailsFromX(item)
         videos.append(video_details)
     return videos
@@ -162,9 +191,7 @@ def search_youtube_videos(niche: str)-> list[ExtractedVideoDetails]:
 
     videos = []
 
-    for item in client.dataset(
-            run["defaultDatasetId"]
-    ).iterate_items():
+    for item in client.dataset(run.default_dataset_id).iterate_items():
 
         if item.get("error"):
             continue

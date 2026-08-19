@@ -2,7 +2,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from app.Schemea.AnalyzeVideoSchema import ScrapingStatus
 
-class Platform(str, Enum):
+class AnalyzeContentPlatform(str, Enum):
     YOUTUBE = "YOUTUBE"
     TIKTOK = "TIKTOK"
     FACEBOOK = "FACEBOOK"
@@ -16,7 +16,7 @@ class SumOfContent(str, Enum):
 
 class AnalyzeContentScrape(BaseModel):
     order_id: int = Field(alias="orderId")
-    platform: Platform
+    platform: AnalyzeContentPlatform
     sum_of_content: SumOfContent = Field(alias="sumOfContent")
     niche: str
 

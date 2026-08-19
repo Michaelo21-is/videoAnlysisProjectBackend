@@ -48,6 +48,9 @@ public class OrderAnalyzeContents {
     @Column(name = "credit_cost", nullable = false)
     private Long creditCost;
 
+    @Column(name = "niche", nullable = false)
+    private String niche;
+
     @Column(name = "purchased_at")
     private Instant purchasedAt;
 

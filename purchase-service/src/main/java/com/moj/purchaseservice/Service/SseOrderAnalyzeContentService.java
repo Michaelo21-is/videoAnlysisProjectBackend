@@ -117,7 +117,7 @@ public class SseOrderAnalyzeContentService {
             emitter.send(
                     SseEmitter.event()
                             .id(response.getOrderId().toString())
-                            .name("analyze-content-status")
+                            .name("order-analyze-content-failed")
                             .data(response)
             );
 

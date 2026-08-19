@@ -78,6 +78,8 @@ public class PurchaseService {
                 .status(OrderAnalyzeContentStatus.PENDING)
                 .sumOfContent(orderAnalyzeContentDto.getSumOfContent())
                 .creditCost(creditCost)
+                .niche(orderAnalyzeContentDto.getNiche())
+                .platform(orderAnalyzeContentDto.getPlatform())
                 .build();
 
         orderAnalyzeContentRepository.save(orderAnalyzeContents);
@@ -100,7 +102,7 @@ public class PurchaseService {
         return orderAnalyzeContents.getId();
     }
     public CheckOrderAnalyzeContentStatusResponse checkOrderAnalyzeContentStatus(UUID userId ,Long orderId) {
-        if (userId == null || orderId == null) {
+        if (orderId == null) {
             log.error("userId or orderId is null in check order analyze content status, order id: {}, user id: {}", orderId, userId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Didn't get the required details");
         }
@@ -120,6 +122,8 @@ public class PurchaseService {
                 return CheckOrderAnalyzeContentStatusResponse.builder()
                         .message("Order analyze content scraping completed successfully")
                         .status(OrderAnalyzeContentStatusResponse.SCRAPING_COMPLETED)
+                        .niche(order.getNiche())
+                        .platform(order.getPlatform())
                         .build();
             }
             case PICKUP_VIDEOS_COMPLETED -> {
@@ -167,6 +171,8 @@ public class PurchaseService {
                     .build());
         }
         else{
+            order.setStatus(OrderAnalyzeContentStatus.PAYMENT_FAILED);
+            orderAnalyzeContentRepository.save(order);
             sseOrderAnalyzeContentService.sendFinalStatus(OrderResponse.builder()
                     .status(Status.PAYMENT_FAILED)
                     .orderId(orderAnalyzeContentStatusDto.getOrderId())

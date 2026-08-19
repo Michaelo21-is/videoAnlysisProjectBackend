@@ -1,7 +1,7 @@
 from enum import Enum
 from urllib.parse import urlparse
 
-class Platform(str, Enum):
+class UrlPlatform(str, Enum):
     YOUTUBE = "YOUTUBE"
     TIKTOK = "TIKTOK"
     FACEBOOK = "FACEBOOK"
@@ -9,9 +9,9 @@ class Platform(str, Enum):
     X="X"
     NOT_SUPPORT = "NOT_SUPPORT"
 
-def check_url_platform(url: str) -> Platform:
+def check_url_platform(url: str) -> UrlPlatform:
     if not url or not url.strip():
-        return Platform.NOT_SUPPORT
+        return UrlPlatform.NOT_SUPPORT
 
     normalized_url = url.strip()
 
@@ -22,7 +22,7 @@ def check_url_platform(url: str) -> Platform:
     hostname = parsed_url.hostname
 
     if hostname is None:
-        return Platform.NOT_SUPPORT
+        return UrlPlatform.NOT_SUPPORT
 
     hostname = hostname.lower()
 
@@ -30,23 +30,23 @@ def check_url_platform(url: str) -> Platform:
         hostname = hostname[4:]
 
     if hostname == "youtube.com" or hostname.endswith(".youtube.com"):
-        return Platform.YOUTUBE
+        return UrlPlatform.YOUTUBE
 
     if hostname == "youtu.be":
-        return Platform.YOUTUBE
+        return UrlPlatform.YOUTUBE
 
     if hostname == "tiktok.com" or hostname.endswith(".tiktok.com"):
-        return Platform.TIKTOK
+        return UrlPlatform.TIKTOK
 
     if hostname == "instagram.com" or hostname.endswith(".instagram.com"):
-        return Platform.INSTAGRAM
+        return UrlPlatform.INSTAGRAM
 
     if (
         hostname == "facebook.com"
         or hostname.endswith(".facebook.com")
         or hostname == "fb.watch"
     ):
-        return Platform.FACEBOOK
+        return UrlPlatform.FACEBOOK
 
     if (
         hostname == "x.com"
@@ -54,6 +54,6 @@ def check_url_platform(url: str) -> Platform:
         or hostname == "twitter.com"
         or hostname.endswith(".twitter.com")
     ):
-        return Platform.X
+        return UrlPlatform.X
 
-    return Platform.NOT_SUPPORT
+    return UrlPlatform.NOT_SUPPORT

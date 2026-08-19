@@ -1,5 +1,5 @@
 import os
-from app.Util.CheckUrlPlatform import Platform
+from app.Util.CheckUrlPlatform import UrlPlatform
 
 from google import genai
 from pydantic import ValidationError
@@ -45,7 +45,7 @@ def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
 def upload_video_url_to_gemini(
     video_url: str,
     audio_url: str | None = None,
-    platform: Platform | None = None,
+    platform: UrlPlatform | None = None,
 ):
     video_path = None
     audio_path = None
@@ -59,7 +59,7 @@ def upload_video_url_to_gemini(
         ) as video_file:
             video_path = video_file.name
 
-            if platform == Platform.TIKTOK:
+            if platform == UrlPlatform.TIKTOK:
                 request = Request(
                     video_url,
                     headers={

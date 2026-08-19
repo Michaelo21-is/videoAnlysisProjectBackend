@@ -1,6 +1,6 @@
 from textwrap import dedent
 
-from app.Util.CheckUrlPlatform import Platform
+from app.Util.CheckUrlPlatform import UrlPlatform
 
 
 
@@ -54,7 +54,7 @@ def _build_business_personalization_context(business_context: str | None,
     ).strip()
 
 
-def build_video_url_analysis_prompt(platform: Platform,video_name: str | None = None, business_context: str | None = None, business_target_audience: str | None = None) -> str:
+def build_video_url_analysis_prompt(platform: UrlPlatform,video_name: str | None = None, business_context: str | None = None, business_target_audience: str | None = None) -> str:
     business_personalization_context = _build_business_personalization_context(
         business_context,
         business_target_audience,
@@ -66,7 +66,7 @@ def build_video_url_analysis_prompt(platform: Platform,video_name: str | None = 
         else "Untitled video"
     )
 
-    if platform == Platform.YOUTUBE:
+    if platform == UrlPlatform.YOUTUBE:
         title_context = """
         TITLE RULES:
         - The provided video is a YouTube video.

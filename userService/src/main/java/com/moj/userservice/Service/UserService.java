@@ -165,11 +165,13 @@ public class UserService {
                     orderAnalyzeContentDto.getOrderId(),
                     OrderStatus.PAYMENT_FAILED
             );
+            return;
         }
         user.setCreditSum(updatedCreditSum);
         userRepository.save(user);
 
-        sendToQueue.sendOrderAnalyzeContentStatus(orderAnalyzeContentDto.getOrderId(), OrderStatus.SUCCEED);
+        sendToQueue.sendOrderAnalyzeContentStatus(orderAnalyzeContentDto.getOrderId(), OrderStatus.PURCHASED);
+
         sendToQueue.sendOrderAnalyzeContentToScrape(OrderAnalyzeContentScrapeResponse.builder()
                 .sumOfContent(orderAnalyzeContentDto.getSumOfContent())
                 .orderId(orderAnalyzeContentDto.getOrderId())

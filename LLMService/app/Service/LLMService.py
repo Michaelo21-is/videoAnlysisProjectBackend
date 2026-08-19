@@ -7,10 +7,10 @@ from app.Config.RabitMqConfig import (rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_R
 from app.Config.RedisConfig import get_cache, set_cache
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
-from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, Platform, AnalyzeContentScrapeResponse, \
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, AnalyzeContentPlatform, AnalyzeContentScrapeResponse, \
     ExtractedVideoDetails
 from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini
-from app.Util.CheckUrlPlatform import check_url_platform, Platform
+from app.Util.CheckUrlPlatform import check_url_platform, UrlPlatform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
 from app.Util.SelectReleventVideos import select_top_relevant_videos
 from app.Service.DiagramService import DiagramService
@@ -20,192 +20,198 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+class LLMService:
+    def __init__(self):
+        self.diagram_service = DiagramService()
+    @staticmethod
+    async def analyze_content_scrape_video(analyze_content_scrape: AnalyzeContentScrape, ) -> None:
 
-async def analyze_content_scrape_video(analyze_content_scrape: AnalyzeContentScrape, ) -> None:
-
-    if (
-            analyze_content_scrape.order_id is None
-            or analyze_content_scrape.platform is None
-            or analyze_content_scrape.sum_of_content is None
-            or analyze_content_scrape.user_id is None
-    ):
-        logger.error("Something went missing, please check the variables: %s",analyze_content_scrape,)
-
-        response = AnalyzeContentScrapeResponse(
-            orderId=analyze_content_scrape.order_id,
-            status=ScrapingStatus.FAILED,
-            message="Required analyze content data is missing",
-        )
-
-        await rabbitmq_manager.publish(
-            response=response,
-            routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
-        )
-        return
-    niche_cache_key = (
-        f"{KEY_PREFIX_SCRAPE_NICHE_CONTENT}:"
-        f"{analyze_content_scrape.platform.value}:"
-        f"{analyze_content_scrape.niche.strip().lower()}"
-    )
-    cached_video_details = await get_cache(niche_cache_key)
-
-    if cached_video_details:
-        logger.info("Video details found in cache, skipping search")
-
-        video_details = [
-            ExtractedVideoDetails.model_validate(video)
-            for video in json.loads(cached_video_details)
-        ]
-        analyze_content_cache_key = (
-            f"{KEY_PREFIX_SCRAPE_ANALYZE_CONTENT}:"
-            f"{analyze_content_scrape.order_id}"
-        )
-
-        await set_cache( analyze_content_cache_key,
-            json.dumps([video.model_dump(mode="json")for video in video_details]),
-            SCRAPE_ANALYZE_CONTENT_TTL,
-        )
-        response = AnalyzeContentScrapeResponse(
-            orderId=analyze_content_scrape.order_id,
-            status=ScrapingStatus.SUCCEED,
-            message="Analyze content scrape video successfully",
-            videos=video_details,
-        )
-
-        await rabbitmq_manager.publish(
-            response=response,
-            routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
-        )
-        return
-    try:
-        if analyze_content_scrape.platform == Platform.YOUTUBE:
-            video_details = await asyncio.to_thread(
-                search_youtube_videos,
-                analyze_content_scrape.niche,
-            )
-
-        elif analyze_content_scrape.platform == Platform.X:
-            video_details = await asyncio.to_thread(
-                search_x_videos,
-                analyze_content_scrape.niche,
-            )
-
-        elif analyze_content_scrape.platform == Platform.TIKTOK:
-            video_details = await asyncio.to_thread(
-                search_tiktok_videos,
-                analyze_content_scrape.niche,
-            )
-
-        elif analyze_content_scrape.platform == Platform.FACEBOOK:
-            video_details = await asyncio.to_thread(
-                search_facebook_videos,
-                analyze_content_scrape.niche,
-            )
-
-        elif analyze_content_scrape.platform == Platform.INSTAGRAM:
-            video_details = await asyncio.to_thread(
-                search_instagram_videos,
-                analyze_content_scrape.niche,
-            )
-
-        else:
-            logger.error(
-                "Invalid platform: %s",
-                analyze_content_scrape.platform,
-            )
+        if (
+                analyze_content_scrape.order_id is None
+                or analyze_content_scrape.platform is None
+                or analyze_content_scrape.sum_of_content is None
+        ):
+            logger.error("Something went missing, please check the variables: %s",analyze_content_scrape,)
 
             response = AnalyzeContentScrapeResponse(
                 orderId=analyze_content_scrape.order_id,
                 status=ScrapingStatus.FAILED,
-                message="Invalid platform",
+                message="Required analyze content data is missing",
             )
 
             await rabbitmq_manager.publish(
                 response=response,
                 routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_content_exchange
             )
             return
-
-        if not video_details:
-            logger.error(
-                "No videos found for the given niche: %s",
-                analyze_content_scrape.niche,
-            )
-
-            response = AnalyzeContentScrapeResponse(
-                orderId=analyze_content_scrape.order_id,
-                status=ScrapingStatus.FAILED,
-                message="No videos found for the given niche",
-            )
-
-            await rabbitmq_manager.publish(
-                response=response,
-                routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
-            )
-            return
-
-        relevant_video_details = select_top_relevant_videos(
-            video_details
-        )
-
-        response = AnalyzeContentScrapeResponse(
-            orderId=analyze_content_scrape.order_id,
-            status=ScrapingStatus.SUCCEED,
-            message="Analyze content scrape video successfully",
-            videos=relevant_video_details,
-        )
-
-        await rabbitmq_manager.publish(
-            response=response,
-            routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
-        )
-        # saving the data in redis
-        analyze_content_cache_key = (
-            f"{KEY_PREFIX_SCRAPE_ANALYZE_CONTENT}:"
-            f"{analyze_content_scrape.order_id}"
-        )
-
         niche_cache_key = (
             f"{KEY_PREFIX_SCRAPE_NICHE_CONTENT}:"
             f"{analyze_content_scrape.platform.value}:"
             f"{analyze_content_scrape.niche.strip().lower()}"
         )
-        await set_cache(
-            analyze_content_cache_key,
-            json.dumps([
-                video.model_dump(mode="json")
-                for video in relevant_video_details
-            ]),
-            SCRAPE_ANALYZE_CONTENT_TTL,
-        )
+        cached_video_details = await get_cache(niche_cache_key)
 
-        await set_cache(
-            niche_cache_key,
-            json.dumps([
-                video.model_dump(mode="json")
-                for video in relevant_video_details
-            ]),
-            SCRAPE_NICHE_CONTENT_TTL,
-        )
+        if cached_video_details:
+            logger.info("Video details found in cache, skipping search")
 
-    except Exception as e:
-        logger.exception("Failed to analyze content scrape video: %s",e,)
+            video_details = [
+                ExtractedVideoDetails.model_validate(video)
+                for video in json.loads(cached_video_details)
+            ]
+            analyze_content_cache_key = (
+                f"{KEY_PREFIX_SCRAPE_ANALYZE_CONTENT}:"
+                f"{analyze_content_scrape.order_id}"
+            )
 
-        response = AnalyzeContentScrapeResponse(
-            orderId=analyze_content_scrape.order_id,
-            status=ScrapingStatus.FAILED,
-            message="Failed to analyze content scrape video",
-        )
+            await set_cache( analyze_content_cache_key,
+                json.dumps([video.model_dump(mode="json")for video in video_details]),
+                SCRAPE_ANALYZE_CONTENT_TTL,
+            )
+            response = AnalyzeContentScrapeResponse(
+                orderId=analyze_content_scrape.order_id,
+                status=ScrapingStatus.SUCCEED,
+                message="Analyze content scrape video successfully",
+                videos=video_details,
+            )
 
-        await rabbitmq_manager.publish(
-            response=response,
-            routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
-        )
+            await rabbitmq_manager.publish(
+                response=response,
+                routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_content_exchange
+            )
+            return
+        try:
+            if analyze_content_scrape.platform == AnalyzeContentPlatform.YOUTUBE:
+                video_details = await asyncio.to_thread(
+                    search_youtube_videos,
+                    analyze_content_scrape.niche,
+                )
+
+            elif analyze_content_scrape.platform == AnalyzeContentPlatform.X:
+                video_details = await asyncio.to_thread(
+                    search_x_videos,
+                    analyze_content_scrape.niche,
+                )
+
+            elif analyze_content_scrape.platform == AnalyzeContentPlatform.TIKTOK:
+                video_details = await asyncio.to_thread(
+                    search_tiktok_videos,
+                    analyze_content_scrape.niche,
+                )
+
+            elif analyze_content_scrape.platform == AnalyzeContentPlatform.FACEBOOK:
+                video_details = await asyncio.to_thread(
+                    search_facebook_videos,
+                    analyze_content_scrape.niche,
+                )
+
+            elif analyze_content_scrape.platform == AnalyzeContentPlatform.INSTAGRAM:
+                video_details = await asyncio.to_thread(
+                    search_instagram_videos,
+                    analyze_content_scrape.niche,
+                )
+
+            else:
+                logger.error(
+                    "Invalid platform: %s",
+                    analyze_content_scrape.platform,
+                )
+
+                response = AnalyzeContentScrapeResponse(
+                    orderId=analyze_content_scrape.order_id,
+                    status=ScrapingStatus.FAILED,
+                    message="Invalid platform",
+                )
+
+                await rabbitmq_manager.publish(
+                    response=response,
+                    routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                    exchange=rabbitmq_manager.order_analyze_content_exchange
+                )
+                return
+
+            if not video_details:
+                logger.error(
+                    "No videos found for the given niche: %s",
+                    analyze_content_scrape.niche,
+                )
+
+                response = AnalyzeContentScrapeResponse(
+                    orderId=analyze_content_scrape.order_id,
+                    status=ScrapingStatus.FAILED,
+                    message="No videos found for the given niche",
+                )
+
+                await rabbitmq_manager.publish(
+                    response=response,
+                    routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                    exchange=rabbitmq_manager.order_analyze_content_exchange
+                )
+                return
+
+            relevant_video_details = select_top_relevant_videos(
+                video_details
+            )
+
+            response = AnalyzeContentScrapeResponse(
+                orderId=analyze_content_scrape.order_id,
+                status=ScrapingStatus.SUCCEED,
+                message="Select the videos you want to analyze.",
+                videos=relevant_video_details,
+            )
+
+            await rabbitmq_manager.publish(
+                response=response,
+                routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_content_exchange
+            )
+            # saving the data in redis
+            analyze_content_cache_key = (
+                f"{KEY_PREFIX_SCRAPE_ANALYZE_CONTENT}:"
+                f"{analyze_content_scrape.order_id}"
+            )
+
+            niche_cache_key = (
+                f"{KEY_PREFIX_SCRAPE_NICHE_CONTENT}:"
+                f"{analyze_content_scrape.platform.value}:"
+                f"{analyze_content_scrape.niche.strip().lower()}"
+            )
+            await set_cache(
+                analyze_content_cache_key,
+                json.dumps([
+                    video.model_dump(mode="json")
+                    for video in relevant_video_details
+                ]),
+                SCRAPE_ANALYZE_CONTENT_TTL,
+            )
+
+            await set_cache(
+                niche_cache_key,
+                json.dumps([
+                    video.model_dump(mode="json")
+                    for video in relevant_video_details
+                ]),
+                SCRAPE_NICHE_CONTENT_TTL,
+            )
+
+        except Exception as e:
+            logger.exception("Failed to analyze content scrape video: %s",e,)
+
+            response = AnalyzeContentScrapeResponse(
+                orderId=analyze_content_scrape.order_id,
+                status=ScrapingStatus.FAILED,
+                message="Failed to analyze content scrape video",
+            )
+
+            await rabbitmq_manager.publish(
+                response=response,
+                routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_content_exchange
+            )
 
 
-class LLMService:
-    def __init__(self):
-        self.diagram_service = DiagramService()
+
     async def analyze_video( self, analyze_video_schema: AnalyzeVideoSchema,) -> None:
         logger.info(f"Received analyze video request: {analyze_video_schema}")
         # 1. לא התקבל שום מקור וידאו
@@ -220,8 +226,9 @@ class LLMService:
             )
 
             await rabbitmq_manager.publish(
-                payload=response,
+                response=response,
                 routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_video_exchange
             )
             return
 
@@ -231,7 +238,7 @@ class LLMService:
                 analyze_video_schema.video_url
             )
 
-            if platform == Platform.NOT_SUPPORT:
+            if platform == UrlPlatform.NOT_SUPPORT:
                 logger.error(
                     "Video URL is not supported, url: %s",
                     analyze_video_schema.video_url
@@ -244,41 +251,42 @@ class LLMService:
                 )
 
                 await rabbitmq_manager.publish(
-                    payload=scraping_response,
+                    response=scraping_response,
                     routing_key=SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY,
+                    exchange=rabbitmq_manager.order_analyze_video_exchange
                 )
                 return
 
             try:
-                if platform == Platform.TIKTOK:
+                if platform == UrlPlatform.TIKTOK:
                     video_details = await asyncio.to_thread(
                         get_tiktok_video_with_url,
                         analyze_video_schema.video_url,
                     )
 
-                elif platform == Platform.INSTAGRAM:
+                elif platform == UrlPlatform.INSTAGRAM:
                     video_details = await asyncio.to_thread(
                         get_instagram_video_with_url,
                         analyze_video_schema.video_url,
                     )
 
-                elif platform == Platform.FACEBOOK:
+                elif platform == UrlPlatform.FACEBOOK:
                     video_details = await asyncio.to_thread(
                         get_facebook_video_with_url,
                         analyze_video_schema.video_url,
                     )
 
-                elif platform == Platform.X:
+                elif platform == UrlPlatform.X:
                     video_details = await asyncio.to_thread(
                         get_x_video_with_url,
                         analyze_video_schema.video_url,
                     )
 
-                elif platform == Platform.YOUTUBE:
+                elif platform == UrlPlatform.YOUTUBE:
                     video_details = {
                         "name": None,
                         "urls": [analyze_video_schema.video_url],
-                        "platform": Platform.YOUTUBE,
+                        "platform": UrlPlatform.YOUTUBE,
                     }
 
                 else:
@@ -296,8 +304,9 @@ class LLMService:
                 )
 
                 await rabbitmq_manager.publish(
-                    payload=scraping_response,
+                    response=scraping_response,
                     routing_key=SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY,
+                    exchange=rabbitmq_manager.order_analyze_video_exchange
                 )
                 return
 
@@ -309,8 +318,9 @@ class LLMService:
             )
 
             await rabbitmq_manager.publish(
-                payload=scraping_response,
+                response=scraping_response,
                 routing_key=SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_video_exchange
             )
 
             prompt = build_video_url_analysis_prompt(
@@ -322,7 +332,7 @@ class LLMService:
             )
             gemini_url = video_details["urls"][0]
             try:
-                if video_details["platform"] != Platform.YOUTUBE:
+                if video_details["platform"] != UrlPlatform.YOUTUBE:
                     gemini_url = await asyncio.to_thread(
                         upload_video_url_to_gemini,
                         gemini_url,
@@ -348,8 +358,9 @@ class LLMService:
                 )
 
                 await rabbitmq_manager.publish(
-                    payload=response,
+                    response=response,
                     routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
+                    exchange=rabbitmq_manager.order_analyze_video_exchange
                 )
                 return
 
@@ -369,8 +380,9 @@ class LLMService:
             )
 
             await rabbitmq_manager.publish(
-                payload=response,
+                response=response,
                 routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_video_exchange
             )
 
             return
@@ -398,8 +410,9 @@ class LLMService:
                 )
 
                 await rabbitmq_manager.publish(
-                    payload=response,
+                    response=response,
                     routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
+                    exchange=rabbitmq_manager.order_analyze_video_exchange
                 )
                 return
 
@@ -419,8 +432,9 @@ class LLMService:
             )
 
             await rabbitmq_manager.publish(
-                payload=response,
+                response=response,
                 routing_key=ANALYZE_VIDEO_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_video_exchange
             )
 
             return

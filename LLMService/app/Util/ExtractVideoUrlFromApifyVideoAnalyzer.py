@@ -1,5 +1,5 @@
 from typing import Any
-from app.Util.CheckUrlPlatform import Platform
+from app.Util.CheckUrlPlatform import UrlPlatform
 
 def extract_tiktok_media(
     item: dict[str, Any],
@@ -49,7 +49,7 @@ def extract_tiktok_media(
             return {
                 "name": video_name,
                 "urls": [video_url],
-                "platform": Platform.TIKTOK,
+                "platform": UrlPlatform.TIKTOK,
             }
 
     raise ValueError(
@@ -91,7 +91,7 @@ def extract_instagram_reel_media(
         "name": reel_name.strip(),
         "urls": [video_url],
         "audioUrl": audio_url,
-        "platform": Platform.INSTAGRAM,
+        "platform": UrlPlatform.INSTAGRAM,
     }
 def extract_X_video_media(item: dict[str, Any]) -> dict[str, Any]:
     status = item.get("status")
@@ -136,7 +136,7 @@ def extract_X_video_media(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": str(video_name).strip(),
         "urls": [download_url],
-        "platform": Platform.X
+        "platform": UrlPlatform.X
     }
 def extract_facebook_video_media(item: dict[str, Any],) -> dict[str, Any]:
     download_url = item.get("download_url")
@@ -157,7 +157,7 @@ def extract_facebook_video_media(item: dict[str, Any],) -> dict[str, Any]:
     return {
         "name": str(video_name).strip() or "Facebook video",
         "urls": [download_url],
-        "platform": Platform.FACEBOOK
+        "platform": UrlPlatform.FACEBOOK
     }
 
 
