@@ -3,25 +3,19 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Query, status
 
-from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrapeResponse
 from app.Schemea.DiagramSchema import DiagramCreate, DiagramNameListResponse, UserDiagramsResponse, DiagramResponse, DiagramUpdate
 from app.Service.DiagramService import DiagramService
 from app.Service.LLMService import LLMService
-
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrapeResponse
 
 router = APIRouter(prefix="/api/llm", tags=["LLM"])
 
 diagram_service = DiagramService()
 
 
-@router.post(
-    "/create-diagram",
-    status_code=status.HTTP_201_CREATED,
-)
-def create_diagram(
-    diagram: DiagramCreate,
-    user_id: Annotated[UUID, Header(alias="X-USER-ID")],
-) -> None:
+@router.post("/create-diagram",status_code=status.HTTP_201_CREATED,)
+def create_diagram( diagram: DiagramCreate,user_id: Annotated[UUID, Header(alias="X-USER-ID")],) -> None:
     diagram_service.create_diagram(
         diagram=diagram,
         user_id=user_id,
@@ -71,3 +65,8 @@ def get_diagram_by_query(user_id: Annotated[UUID, Header(alias="X-USER-ID")],
 @router.delete("/delete-diagram")
 def delete_diagram(diagram_id: Annotated[str, Query()], user_id: Annotated[UUID, Header(alias="X-USER-ID")]) -> None:
     diagram_service.delete_diagram(diagram_id=diagram_id,user_id=user_id,)
+
+@router.get("/get-analyze-content-scrape-response")
+async def get_video_details(order_id: Annotated[int, Query()]) -> AnalyzeContentScrapeResponse:
+    video_details = await LLMService.get_video_details(order_id=order_id)
+    return video_details

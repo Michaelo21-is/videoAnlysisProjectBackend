@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
@@ -13,5 +15,5 @@ public class OderAnalyzeContentScrapingDto {
     private Long orderId;
     private String message;
     private ScrapingStatus status;
-    private ExtractedVideoDetails extractedVideoDetails;
+    private List<ExtractedVideoDetails> extractedVideoDetails;
 }

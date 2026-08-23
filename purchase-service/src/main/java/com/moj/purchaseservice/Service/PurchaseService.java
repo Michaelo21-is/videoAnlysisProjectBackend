@@ -111,11 +111,27 @@ public class PurchaseService {
         if (!order.getUserId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to access this order");
         }
+        int sumOfVideos = 0;
+        switch (order.getSumOfContent()){
+            case THREE -> {
+                sumOfVideos = 3;
+            }
+            case FIVE -> {
+                sumOfVideos = 5;
+            }
+            case SEVEN -> {
+                sumOfVideos = 7;
+            }
+        }
+
         switch (order.getStatus()) {
             case PURCHASED -> {
                 return CheckOrderAnalyzeContentStatusResponse.builder()
                         .message("Order analyze content purchased successfully")
                         .status(OrderAnalyzeContentStatusResponse.PURCHASED)
+                        .totalContent(sumOfVideos)
+                        .niche(order.getNiche())
+                        .platform(order.getPlatform())
                         .build();
             }
             case SCRAPING_COMPLETED -> {
@@ -124,24 +140,34 @@ public class PurchaseService {
                         .status(OrderAnalyzeContentStatusResponse.SCRAPING_COMPLETED)
                         .niche(order.getNiche())
                         .platform(order.getPlatform())
+                        .totalContent(sumOfVideos)
                         .build();
             }
             case PICKUP_VIDEOS_COMPLETED -> {
                 return CheckOrderAnalyzeContentStatusResponse.builder()
                         .message("Order analyze content scraping completed successfully")
                         .status(OrderAnalyzeContentStatusResponse.PICKUP_VIDEOS_COMPLETED)
+                        .niche(order.getNiche())
+                        .platform(order.getPlatform())
+                        .totalContent(sumOfVideos)
                         .build();
             }
             case ANALYZE_CONTENT_COMPLETED -> {
                 return CheckOrderAnalyzeContentStatusResponse.builder()
                         .message("Order analyze content scraping completed successfully")
                         .status(OrderAnalyzeContentStatusResponse.ANALYZING_VIDEOS_COMPLETED)
+                        .niche(order.getNiche())
+                        .platform(order.getPlatform())
+                        .totalContent(sumOfVideos)
                         .build();
             }
             case SUCCEED -> {
                 return CheckOrderAnalyzeContentStatusResponse.builder()
                         .message("complete analyze content successfully")
                         .status(OrderAnalyzeContentStatusResponse.GENERATING_RESPONSE)
+                        .niche(order.getNiche())
+                        .platform(order.getPlatform())
+                        .totalContent(sumOfVideos)
                         .build();
             }
             default -> {

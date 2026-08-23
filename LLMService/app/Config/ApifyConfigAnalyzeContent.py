@@ -14,7 +14,7 @@ def get_first_dataset_item(result) -> dict:
     if item is None:
         raise ValueError("Apify did not return any dataset items")
     return item
-def search_tiktok_videos(niche: str) -> list[ExtractedVideoDetails]:
+def search_tiktok_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
     run_input = {
         "hashtags": [],
         "resultsPerPage": 50,
@@ -24,7 +24,7 @@ def search_tiktok_videos(niche: str) -> list[ExtractedVideoDetails]:
         "profileSorting": "latest",
         "excludePinnedPosts": False,
 
-        "searchQueries": [niche],
+        "searchQueries": queries,
         "searchSection": "",
         "maxProfilesPerQuery": 10,
 
@@ -70,27 +70,14 @@ def search_tiktok_videos(niche: str) -> list[ExtractedVideoDetails]:
         videos.append(video_details)
 
     return videos
-    run = client.actor("GdWCkxBtKWOsKjdch").call(run_input=run_input)
 
-    videos = []
 
-    for item in client.dataset(run.default_dataset_id).iterate_items():
-
-        if item.get("errorCode"):
-            continue
-
-        video_details = extractedVideoDetailsFromTiktok(item)
-
-        videos.append(video_details)
-
-    return videos
-
-def search_instagram_videos(niche: str) -> list[ExtractedVideoDetails]:
+def search_instagram_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
     run_input = {
         "resultsType": "details",
         "directUrls": None,
 
-        "search": niche,
+        "search": queries,
         "searchType": "hashtag",
         "searchLimit": 50,
 
@@ -109,37 +96,33 @@ def search_instagram_videos(niche: str) -> list[ExtractedVideoDetails]:
 
     return videos
 
-def search_x_videos(niche: str) -> list[ExtractedVideoDetails]:
+def search_x_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
     run_input = {
-        "startUrls": None,
-        "twitterHandles": None,
-        "conversationIds": None,
+        "startUrls": [],
+        "twitterHandles": [],
+        "conversationIds": [],
 
-        "searchTerms": [
-            niche
-        ],
+        "searchTerms": queries,
 
         "maxItems": 50,
 
-        # בשביל discovery הייתי מעדיף את זה
         "sort": "Latest + Top",
-
         "tweetLanguage": "en",
 
-        # חשוב מאוד אצלך
         "onlyVideo": True,
 
-        "onlyVerifiedUsers": None,
-        "onlyTwitterBlue": None,
-        "onlyImage": None,
-        "onlyQuote": None,
+        "onlyVerifiedUsers": False,
+        "onlyTwitterBlue": False,
+        "onlyImage": False,
+        "onlyQuote": False,
 
-        "minimumRetweets": None,
-        "minimumFavorites": None,
-        "minimumReplies": None,
+        "minimumRetweets": 0,
+        "minimumFavorites": 0,
+        "minimumReplies": 0,
 
         "includeSearchTerms": True,
     }
+
     run = client.actor("61RPP7dywgiy0JPD0").call(run_input=run_input)
     videos = []
     for item in client.dataset(run.default_dataset_id).iterate_items():
@@ -149,37 +132,29 @@ def search_x_videos(niche: str) -> list[ExtractedVideoDetails]:
         videos.append(video_details)
     return videos
 
-def search_facebook_videos(niche: str) -> list[dict]:
+def search_facebook_videos(queries: list[str]) -> list[dict]:
     run_input = {
-        "query": niche,
-        "recent_videos": None,
-        "location_uid": None,
-        "start_date": None,
-        "end_date": None,
+        "query": queries,
+        "recent_videos": True,
         "maxResults": 50,
     }
     run = client.actor("i3bvo5XREqhCpa2f8").call(run_input=run_input)
     videos = []
-    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+    for item in client.dataset(run.default_dataset_id).iterate_items():
         video_details = extractedVideoDetailsFromFacebook(item)
         videos.append(video_details)
     return videos
 
-def search_youtube_videos(niche: str)-> list[ExtractedVideoDetails]:
+def search_youtube_videos(queries: list[str])-> list[ExtractedVideoDetails]:
     run_input = {
-        "searchQueries": [niche],
+        "searchQueries": queries,
 
-        # Regular YouTube videos
         "maxResults": 0,
-
-        # Only Shorts
-        "maxResultsShorts": 50,
-
+        "maxResultsShorts": 100,
         "maxResultStreams": 0,
 
         "sortingOrder": "relevance",
-
-        "dateFilter": "week",
+        "dateFilter": "month",
 
         "downloadSubtitles": False,
         "aiVideoDescription": False,

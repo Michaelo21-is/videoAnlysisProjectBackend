@@ -16,4 +16,5 @@ public class CheckOrderAnalyzeContentStatusResponse {
     private OrderAnalyzeContentStatusResponse status;
     private String niche;
     private Platform platform;
+    private Integer totalContent;
 }
