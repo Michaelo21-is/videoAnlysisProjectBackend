@@ -42,15 +42,10 @@ def select_top_relevant_videos(
 
     scored_videos = []
 
-    total_videos = len(valid_videos)
 
     for index, video in enumerate(valid_videos):
 
-        relevance_score = (
-            1 - (index / (total_videos - 1))
-            if total_videos > 1
-            else 1
-        )
+
 
         views_score = _normalize(
             video.views,
@@ -73,11 +68,10 @@ def select_top_relevant_videos(
         )
 
         final_score = (
-            relevance_score * 0.40
-            + views_score * 0.25
-            + likes_score * 0.12
-            + comments_score * 0.08
-            + shares_score * 0.15
+                views_score * 0.42
+                + likes_score * 0.20
+                + comments_score * 0.13
+                + shares_score * 0.25
         )
 
         scored_videos.append(

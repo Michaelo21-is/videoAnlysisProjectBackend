@@ -60,8 +60,11 @@ ORDER_ANALYZE_CONTENT_SCRAPE_QUEUE = (
     "order-analyze-content-scrape-queue"
 )
 
+# Must stay byte-identical to userService's
+# RabbitMqConfig.ORDER_ANALYZE_CONTENT_SCRAPE_ROUTING_KEY - that is the key the
+# scrape request is actually published with.
 ORDER_ANALYZE_CONTENT_SCRAPE_ROUTING_KEY = (
-    "order_analyze_content.scrape.routing_key"
+    "order_analyze_content.scrape.routing-key"
 )
 
 # Response: LLM Service -> Purchase Service

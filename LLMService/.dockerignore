@@ -1,0 +1,21 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache - keeps host bytecode out of the image
+__pycache__/
+*.py[cod]
+
+# Git and IDE
+.git/
+.gitignore
+.idea/
+
+# Testing and tooling
+.pytest_cache/
+.mypy_cache/
+
+# OS files
+.DS_Store
+Thumbs.db

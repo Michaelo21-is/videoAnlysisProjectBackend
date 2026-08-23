@@ -25,7 +25,7 @@ class QueryExpansionService:
 
         self._lock = threading.Lock()
 
-    def generate_search_queries( self,niche: str,amount: int = 8,) -> list[str]:
+    def generate_search_queries(  self,niche: str,amount: int = 6, ) -> list[str]:
 
         messages = cast(
             list[ChatCompletionRequestMessage],
@@ -33,8 +33,10 @@ class QueryExpansionService:
                 {
                     "role": "system",
                     "content": (
-                        "You generate search queries for discovering "
-                        "successful and relevant content on social media platforms. "
+                        "You generate semantic search queries for social media. "
+                        "Your goal is to find different ways people search for "
+                        "the same topic, not variations that simply repeat the "
+                        "original niche keyword. "
                         "Return JSON only."
                     ),
                 },
@@ -42,22 +44,21 @@ class QueryExpansionService:
                     "role": "user",
                     "content": f"""
                 Generate {amount} diverse social media search queries
-                for the niche "{niche}".
+                semantically related to "{niche}".
                 
                 Rules:
-                - Every query must be strongly related to "{niche}".
-                - Cover different subtopics and search intents.
-                - Queries should contain 2-5 words.
-                - The queries should work well across social media platforms
-                  such as YouTube, TikTok, Instagram, Facebook, and X.
-                - Focus on queries useful for discovering popular,
-                  engaging, or successful content.
-                - Avoid duplicate meanings.
-                - Include the original niche.
-                - Do not include platform names unless they are relevant to the niche.
-                - Do not explain anything.
+                - Queries do not need to contain "{niche}".
+                - Use synonyms, related concepts, problems, solutions,
+                  use cases, and alternative terminology.
+                - Think about what someone interested in "{niche}" would actually search for.
+                - Each query must represent a different search intent or subtopic.
+                - Avoid duplicate or nearly identical queries.
+                - Use short, natural search phrases.
+                - Return exactly {amount} queries.
+                - Return JSON only.
+
+               
                 
-                Return:
                 {{
                     "queries": [
                         "query"
@@ -91,8 +92,8 @@ class QueryExpansionService:
             response = self.llm.create_chat_completion(
                 messages=messages,
                 response_format=response_format,
-                temperature=0.4,
-                max_tokens=160,
+                temperature=0.5,
+                max_tokens=180,
             )
 
         content = response["choices"][0]["message"]["content"]
@@ -111,12 +112,14 @@ class QueryExpansionService:
         # Remove duplicates while preserving order
         queries = list(dict.fromkeys(queries))
 
-        # Always include the original niche
-        if niche.lower() not in {
-            query.lower()
+        # Always keep the original niche as the first search query
+        queries = [
+            query
             for query in queries
-        }:
-            queries.insert(0, niche)
+            if query.lower() != niche.lower()
+        ]
+
+        queries.insert(0, niche)
 
         return queries[:amount]
 

@@ -150,10 +150,9 @@ def search_youtube_videos(queries: list[str])-> list[ExtractedVideoDetails]:
         "searchQueries": queries,
 
         "maxResults": 0,
-        "maxResultsShorts": 100,
+        "maxResultsShorts": 10,
         "maxResultStreams": 0,
 
-        "sortingOrder": "relevance",
         "dateFilter": "month",
 
         "downloadSubtitles": False,

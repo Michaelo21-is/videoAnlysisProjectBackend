@@ -1,5 +1,5 @@
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.Schemea.AnalyzeVideoSchema import ScrapingStatus
 
 class AnalyzeContentPlatform(str, Enum):
@@ -15,12 +15,16 @@ class SumOfContent(str, Enum):
     SEVEN="SEVEN"
 
 class AnalyzeContentScrape(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     order_id: int = Field(alias="orderId")
     platform: AnalyzeContentPlatform
     sum_of_content: SumOfContent = Field(alias="sumOfContent")
     niche: str
 
 class CreatorDetails(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str | None = None
     profile_url: str | None = Field(default=None, alias="profileUrl")
     avatar: str | None = None
@@ -29,6 +33,8 @@ class CreatorDetails(BaseModel):
 
 
 class ExtractedVideoDetails(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str | None = None
     caption: str | None = None
     url: str | None = None
@@ -43,10 +49,50 @@ class ExtractedVideoDetails(BaseModel):
 
     creator: CreatorDetails
 
-    duration: int | float | str | None = None
+    # Seconds. Every platform reports duration differently (Apify's YouTube
+    # actor returns "HH:MM:SS", TikTok/Instagram a number, X/Facebook nothing),
+    # so it is normalized here: the published contract is always a number or
+    # null, never a string.
+    duration: int | None = None
+
+    @field_validator("duration", mode="before")
+    @classmethod
+    def _normalize_duration(cls, value: object) -> int | None:
+        if value is None or isinstance(value, bool):
+            return None
+
+        if isinstance(value, (int, float)):
+            return int(value)
+
+        if isinstance(value, str):
+            raw = value.strip()
+
+            if not raw:
+                return None
+
+            # "HH:MM:SS" / "MM:SS"
+            if ":" in raw:
+                seconds = 0
+
+                for part in raw.split(":"):
+                    try:
+                        seconds = seconds * 60 + int(part)
+                    except ValueError:
+                        return None
+
+                return seconds
+
+            try:
+                return int(float(raw))
+            except ValueError:
+                return None
+
+        return None
 
 
 class AnalyzeContentScrapeResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     order_id: int = Field(alias="orderId")
     message: str
     status: ScrapingStatus

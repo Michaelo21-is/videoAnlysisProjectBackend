@@ -26,7 +26,7 @@ def update_diagram(diagram: DiagramUpdate, user_id: Annotated[UUID, Header(alias
 
 
 @router.get("/user-diagrams/recent",status_code=status.HTTP_200_OK,)
-def get_user_diagrams(   user_id: Annotated[UUID, Header(alias="X-USER-ID")] ) -> DiagramNameListResponse:
+def get_recent_user_diagrams(   user_id: Annotated[UUID, Header(alias="X-USER-ID")] ) -> DiagramNameListResponse:
     return diagram_service.get_recent_user_diagrams(
         user_id=user_id,
     )
