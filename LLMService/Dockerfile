@@ -22,12 +22,12 @@ RUN pip install --no-cache-dir llama-cpp-python \
 # Directory for the local Qwen model
 RUN mkdir -p /app/models
 
-# Download Qwen2.5 0.5B Q4 model during Docker build
+# Download Qwen3 1.7B Q4_K_M
 RUN python -c "\
 from huggingface_hub import hf_hub_download; \
 hf_hub_download( \
-    repo_id='Qwen/Qwen2.5-0.5B-Instruct-GGUF', \
-    filename='qwen2.5-0.5b-instruct-q4_k_m.gguf', \
+    repo_id='ggml-org/Qwen3-1.7B-GGUF', \
+    filename='Qwen3-1.7B-Q4_K_M.gguf', \
     local_dir='/app/models' \
 )"
 

@@ -1,5 +1,6 @@
 package com.moj.purchaseservice.Dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,10 +18,13 @@ public class ExtractedVideoDetails {
     private Integer comments;
     private Integer shares;
 
-    private String created_at;
+    private String createdAt;
     private String thumbnail;
 
+    @JsonProperty("creator")
     private CreatorDetails creatorDetails;
 
-    private int duration;
+    // Boxed on purpose: the LLM service sends null whenever the platform does
+    // not report a duration, and Jackson refuses to map null onto a primitive.
+    private Integer duration;
 }

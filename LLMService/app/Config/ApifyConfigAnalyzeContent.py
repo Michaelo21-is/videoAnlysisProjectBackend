@@ -150,7 +150,7 @@ def search_youtube_videos(queries: list[str])-> list[ExtractedVideoDetails]:
         "searchQueries": queries,
 
         "maxResults": 0,
-        "maxResultsShorts": 10,
+        "maxResultsShorts": 5,
         "maxResultStreams": 0,
 
         "dateFilter": "month",
@@ -170,9 +170,7 @@ def search_youtube_videos(queries: list[str])-> list[ExtractedVideoDetails]:
         if item.get("error"):
             continue
 
-        videos.append(
-            extractedVideoDetailsFromYoutube(item)
-        )
+        videos.append(extractedVideoDetailsFromYoutube(item))
 
     return videos
 

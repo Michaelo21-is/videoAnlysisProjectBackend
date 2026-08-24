@@ -24,6 +24,7 @@ public class RabbitMqConfig {
     public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE = "order-analyze-content-status-queue";
 
     public static final String ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_QUEUE = "order-analyze-content-scrape-response-queue";
+    public static final String ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY = "order_analyze_content.scrape_response.routing_key";
 
     public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
     public static final String ORDER_CREDIT_EXCHANGE = "order-credit-exchange";
@@ -204,6 +205,17 @@ public class RabbitMqConfig {
         return QueueBuilder
                 .durable(ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_QUEUE)
                 .build();
+    }
+
+    @Bean
+    public Binding orderAnalyzeContentScrapeResponseBinding(
+            @Qualifier("orderAnalyzeContentScrapeResponseQueue") Queue queue,
+            @Qualifier("orderAnalyzeContentExchange") DirectExchange exchange
+    ) {
+        return BindingBuilder
+                .bind(queue)
+                .to(exchange)
+                .with(ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY);
     }
 
     @Bean
