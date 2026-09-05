@@ -17,7 +17,7 @@ def get_first_dataset_item(result) -> dict:
 def search_tiktok_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
     run_input = {
         "hashtags": [],
-        "resultsPerPage": 50,
+        "resultsPerPage": 10,
 
         "profiles": [],
         "profileScrapeSections": ["videos"],
@@ -38,7 +38,7 @@ def search_tiktok_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
         "scrapeRelatedVideos": False,
         "scrapeAdditionalAuthorMeta": False,
 
-        "shouldDownloadVideos": False,
+        "shouldDownloadVideos": True,
         "shouldDownloadCovers": False,
         "shouldDownloadSlideshowImages": False,
         "shouldDownloadAvatars": False,
@@ -74,12 +74,12 @@ def search_tiktok_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
 
 def search_instagram_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
     run_input = {
-        "resultsType": "details",
+        "resultsType": "reels",
         "directUrls": None,
 
         "search": queries,
         "searchType": "hashtag",
-        "searchLimit": 50,
+        "searchLimit": 10,
 
         "addParentData": False,
     }
@@ -104,7 +104,7 @@ def search_x_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
 
         "searchTerms": queries,
 
-        "maxItems": 50,
+        "maxItems": 10,
 
         "sort": "Latest + Top",
         "tweetLanguage": "en",
@@ -136,7 +136,7 @@ def search_facebook_videos(queries: list[str]) -> list[dict]:
     run_input = {
         "query": queries,
         "recent_videos": True,
-        "maxResults": 50,
+        "maxResults": 10,
     }
     run = client.actor("i3bvo5XREqhCpa2f8").call(run_input=run_input)
     videos = []

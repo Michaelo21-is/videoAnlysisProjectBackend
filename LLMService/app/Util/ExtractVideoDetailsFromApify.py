@@ -10,11 +10,19 @@ from app.Schemea.AnalyzeContentSchema import (
 def extractedVideoDetailsFromTiktok(item: dict) -> ExtractedVideoDetails:
     author_meta = item.get("authorMeta") or {}
     video_meta = item.get("videoMeta") or {}
+    media_urls = item.get("mediaUrls") or []
+
+    mp4_url = (
+        video_meta.get("downloadAddr")
+        or (media_urls[0] if media_urls else None)
+    )
 
     return ExtractedVideoDetails(
         id=item.get("id"),
         caption=item.get("text"),
         url=item.get("webVideoUrl"),
+
+        mp4Url=mp4_url,
 
         views=item.get("playCount") or 0,
         likes=item.get("diggCount") or 0,
@@ -40,7 +48,12 @@ def extractedVideoDetailsFromInstagram(item: dict) -> ExtractedVideoDetails:
     return ExtractedVideoDetails(
         id=item.get("id"),
         caption=item.get("caption"),
+
+        # Instagram post/reel URL
         url=item.get("url"),
+
+        # Direct MP4 URL
+        mp4Url=item.get("videoUrl"),
 
         views=item.get("videoPlayCount") or 0,
         likes=item.get("likesCount") or 0,

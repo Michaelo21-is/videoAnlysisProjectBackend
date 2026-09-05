@@ -38,6 +38,7 @@ class ExtractedVideoDetails(BaseModel):
     id: str | None = None
     caption: str | None = None
     url: str | None = None
+    mp4Url: str | None = Field(default=None, alias="mp4Url")
 
     views: int = 0
     likes: int = 0

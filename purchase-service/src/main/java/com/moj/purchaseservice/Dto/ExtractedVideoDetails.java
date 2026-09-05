@@ -12,6 +12,7 @@ public class ExtractedVideoDetails {
     private String id;
     private String caption;
     private String url;
+    private String mp4Url;
 
     private Integer views;
     private Integer likes;
