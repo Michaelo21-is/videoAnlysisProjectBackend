@@ -1,134 +1,138 @@
 import json
 import threading
-from typing import cast
+from pathlib import Path
 
-from llama_cpp import Llama
-from llama_cpp.llama_types import (
-    ChatCompletionRequestMessage,
-    ChatCompletionRequestResponseFormat,
+import torch
+from peft import AutoPeftModelForCausalLM
+from transformers import AutoTokenizer
+
+
+# Fine-tuned LoRA adapter for Qwen/Qwen3-1.7B.
+# The base model is resolved from adapter_config.json.
+MODEL_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "LocalLLM"
+    / "qwen-query-generator"
 )
+
+# The adapter was trained in bfloat16 and runs on CPU here.
+# float32 roughly doubles the memory footprint of the model.
+MODEL_DTYPE = torch.bfloat16
+
+# Qwen3 non-thinking sampling settings.
+# The small repetition penalty discourages near duplicate queries.
+TEMPERATURE = 0.7
+TOP_P = 0.8
+TOP_K = 20
+REPETITION_PENALTY = 1.05
+MAX_NEW_TOKENS = 300
 
 
 class QueryExpansionService:
 
     def __init__(self):
-        self.llm = Llama(
-            model_path="/app/models/Qwen3-1.7B-Q4_K_M.gguf",
-            n_ctx=2048,
-            n_gpu_layers=0,
-            n_threads=2,
-            verbose=False,
+        self.tokenizer = AutoTokenizer.from_pretrained(str(MODEL_PATH))
+
+        model = AutoPeftModelForCausalLM.from_pretrained(
+            str(MODEL_PATH),
+            dtype=MODEL_DTYPE,
         )
+
+        # Fold the LoRA weights into the base model.
+        # This is inference only and removes the adapter
+        # overhead from every generation.
+        self.model = model.merge_and_unload()
+        self.model.eval()
 
         self._lock = threading.Lock()
 
-    # returning list of search queries 6 + the original niche
-    def generate_search_queries(  self,niche: str,amount: int = 10, ) -> list[str]:
-        messages = cast(
-            list[ChatCompletionRequestMessage],
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "You generate natural social media search phrases for potential "
-                        "customers of a product type. "
-                        "Your job is to understand what these people are trying to do, "
-                        "solve, improve, learn or achieve, and turn those intents into "
-                        "realistic TikTok, YouTube Shorts and Instagram searches. "
-                        "Do not perform keyword expansion of the product name. "
-                        "Return JSON only."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"""
-                       Product type: "{niche}"
-
-                       Generate {amount} natural social media search phrases
-                       that people who could use this type of product would search for.
-
-                       Before generating the searches, internally think about:
-                       - who would use this product
-                       - what problems they have
-                       - what they are trying to accomplish
-                       - what results they want
-                       - what tasks they regularly perform
-                       - what related content they would watch
-                       - what situations create a need for this product
-
-                       Do not output this analysis.
-                       Output only the final search phrases.
-
-                       The searches should discover videos whose viewers are likely
-                       to be interested in this product type, even if the video never
-                       mentions the product category itself.
-
-                       Rules:
-                       - Search for customer intent, not the product category.
-                       - Do not simply expand or rewrite the product type.
-                       - Do not attach extra words to the product type.
-                       - Prefer problems, actions, goals, situations and desired results.
-                       - Include different customer intents, not variations of one intent.
-                       - Write searches like a real person using social media search.
-                       - Use simple and natural language.
-                       - Prefer phrases that could lead to useful, interesting or viral videos.
-                       - Avoid corporate, academic and SEO language.
-                       - Avoid generic category descriptions.
-                       - Do not generate full sentences.
-                       - Do not generate formal questions.
-                       - Keep each query between 2 and 5 words.
-                       - Do not include years or dates.
-                       - Return exactly {amount} queries.
-                       - Return JSON only.
-
-
-                       {{
-                           "queries": [
-                               "query"
-                           ]
-                       }}
-                       """,
-                },
-            ],
+    # This prompt must stay identical to the one used during fine-tuning.
+    # The model was trained on the raw prompt text, not on a chat template.
+    @staticmethod
+    def _build_prompt(niche: str) -> str:
+        return (
+            "Generate exactly 10 natural YouTube Shorts search queries "
+            "for this product.\n\n"
+            f"Product: {niche}\n"
+            "Every query must be something a potential customer of this exact "
+            "product could realistically search for on YouTube Shorts. "
+            "Queries may include closely related interests, problems, use cases, "
+            "or outcomes, but they must not name or describe a different product. "
+            "The 10 queries must represent different search intents. "
+            "Do not repeat queries and do not create trivial rewordings of the "
+            "same query.\n"
+            "Return only valid JSON in exactly this format:\n"
+            '{"queries": ["query 1", "query 2", "..."]}'
         )
 
-        response_format = cast(
-            ChatCompletionRequestResponseFormat,
-            {
-                "type": "json_object",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "queries": {
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                            },
-                        },
-                    },
-                    "required": ["queries"],
-                },
-            },
-        )
+    def _generate(self, prompt: str) -> str:
+        inputs = self.tokenizer(
+            prompt,
+            return_tensors="pt",
+        ).to(self.model.device)
 
-        with self._lock:
-            response = self.llm.create_chat_completion(
-                messages=messages,
-                response_format=response_format,
-                temperature=0.5,
-                max_tokens=180,
+        with self._lock, torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=MAX_NEW_TOKENS,
+                do_sample=True,
+                temperature=TEMPERATURE,
+                top_p=TOP_P,
+                top_k=TOP_K,
+                repetition_penalty=REPETITION_PENALTY,
+                pad_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
             )
 
-        content = response["choices"][0]["message"]["content"]
+        # Keep only the tokens the model generated after the prompt
+        generated_tokens = outputs[0][inputs["input_ids"].shape[1]:]
 
-        if not isinstance(content, str):
+        response = self.tokenizer.decode(
+            generated_tokens,
+            skip_special_tokens=True,
+        )
+
+        return response.strip()
+
+    @staticmethod
+    def _parse_response(response: str) -> dict:
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            pass
+
+        # The model is trained to return JSON only, but fall back to the
+        # first JSON object in the response instead of losing the generation
+        start = response.find("{")
+        end = response.rfind("}")
+
+        if start == -1 or end <= start:
             raise ValueError("Qwen returned an invalid response")
 
-        data = json.loads(content)
+        try:
+            return json.loads(response[start:end + 1])
+        except json.JSONDecodeError as error:
+            raise ValueError("Qwen returned an invalid response") from error
+
+    # returning list of search queries 6 + the original niche
+    def generate_search_queries(  self,niche: str,amount: int = 10, ) -> list[str]:
+        prompt = self._build_prompt(niche)
+
+        response = self._generate(prompt)
+
+        data = self._parse_response(response)
+
+        if not isinstance(data, dict):
+            raise ValueError("Qwen returned an invalid response")
+
+        generated_queries = data.get("queries")
+
+        if not isinstance(generated_queries, list):
+            raise ValueError("Qwen returned an invalid response")
 
         queries = [
             query.strip()
-            for query in data.get("queries", [])
+            for query in generated_queries
             if isinstance(query, str) and query.strip()
         ]
 

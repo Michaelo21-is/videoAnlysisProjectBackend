@@ -12,23 +12,26 @@ COPY ./requirements.txt /code/requirements.txt
 
 RUN pip install --no-cache-dir --upgrade pip
 
+# Install the CPU-only torch wheel - the container has no GPU.
+# This has to run before the requirements so pip does not pull
+# the much larger CUDA build from PyPI.
+RUN pip install --no-cache-dir torch \
+    --index-url https://download.pytorch.org/whl/cpu
+
 # Install project dependencies
 RUN pip install --no-cache-dir -r /code/requirements.txt
 
-# Install llama-cpp-python CPU wheel
-RUN pip install --no-cache-dir llama-cpp-python \
-    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+# Keep the Hugging Face cache inside the image so the container
+# never downloads the model at runtime
+ENV HF_HOME=/opt/huggingface
 
-# Directory for the local Qwen model
-RUN mkdir -p /app/models
-
-# Download Qwen3 1.7B Q4_K_M
+# Download Qwen3-1.7B - the base model of the fine-tuned LoRA adapter
+# in app/LocalLLM/qwen-query-generator
 RUN python -c "\
-from huggingface_hub import hf_hub_download; \
-hf_hub_download( \
-    repo_id='ggml-org/Qwen3-1.7B-GGUF', \
-    filename='Qwen3-1.7B-Q4_K_M.gguf', \
-    local_dir='/app/models' \
+from huggingface_hub import snapshot_download; \
+snapshot_download( \
+    repo_id='Qwen/Qwen3-1.7B', \
+    allow_patterns=['*.json', '*.safetensors', '*.txt'] \
 )"
 
 # Copy application code

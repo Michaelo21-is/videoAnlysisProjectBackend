@@ -19,3 +19,7 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Fine-tuning checkpoints - only the adapter at the root of
+# app/LocalLLM/qwen-query-generator is loaded at runtime
+app/LocalLLM/**/checkpoint-*/
