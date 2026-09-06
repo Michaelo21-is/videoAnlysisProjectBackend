@@ -18,7 +18,7 @@ async def lifespan(_app: FastAPI):
         llm_service.analyze_video
     )
     await rabbitmq_manager.consume_analyze_content_scrape(
-        llm_service.analyze_content_scrape_video
+        llm_service.analyze_content_scrape
     )
     try:
         yield

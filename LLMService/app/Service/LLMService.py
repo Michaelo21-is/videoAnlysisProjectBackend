@@ -2,6 +2,7 @@ import json
 
 from app.Config.ApifyConfigAnalyzeVideo import get_tiktok_video_with_url, get_instagram_video_with_url, get_facebook_video_with_url, get_x_video_with_url
 from app.Config.ApifyConfigAnalyzeContent import search_youtube_videos, search_x_videos, search_tiktok_videos , search_instagram_videos, search_facebook_videos
+from app.Config.ApifyConfigAnalyzeContentGetMp4Link import get_mp4_link_from_x, get_mp4_link_from_facebook
 from app.Config.RabitMqConfig import (rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_ROUTING_KEY
 , SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY, ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY)
 from app.Config.RedisConfig import get_cache, set_cache
@@ -25,7 +26,7 @@ class LLMService:
     def __init__(self):
         self.diagram_service = DiagramService()
         self.query_expansion_service = query_expansion_service
-    async def analyze_content_scrape_video(self ,analyze_content_scrape: AnalyzeContentScrape, ) -> None:
+    async def analyze_content_scrape(self, analyze_content_scrape: AnalyzeContentScrape, ) -> None:
 
         if (
                 analyze_content_scrape.order_id is None
@@ -165,9 +166,14 @@ class LLMService:
                 )
                 return
 
-            relevant_video_details = select_top_relevant_videos(
-                video_details
-            )
+            relevant_video_details = select_top_relevant_videos(video_details)
+            if analyze_content_scrape.platform in (AnalyzeContentPlatform.X,AnalyzeContentPlatform.FACEBOOK,):
+                if analyze_content_scrape.platform == AnalyzeContentPlatform.X:
+                    m4_links = await asyncio.to_thread(get_mp4_link_from_x, relevant_video_details)
+                else:
+                    m4_links = await asyncio.to_thread(get_mp4_link_from_facebook, relevant_video_details)
+                for video, m4_link in zip(relevant_video_details, m4_links):
+                    video.mp4_link = m4_link
 
 
             # saving the data in redis

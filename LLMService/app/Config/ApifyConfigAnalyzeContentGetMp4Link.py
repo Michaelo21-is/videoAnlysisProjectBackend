@@ -1,17 +1,16 @@
 from apify_client import ApifyClient
 import os
-from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrapeResponse
-
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrapeResponse, ExtractedVideoDetails
 
 api_key = os.environ["APIFY_API"]
 client = ApifyClient(api_key)
 
 
-def get_mp4_link_from_facebook(video_details: AnalyzeContentScrapeResponse) -> list[str]:
+def get_mp4_link_from_facebook(video_details: list[ExtractedVideoDetails]) -> list[str | None]:
 
     facebook_urls = [
         video.url
-        for video in video_details.videos
+        for video in video_details
         if video.url
     ]
 
@@ -39,13 +38,11 @@ def get_mp4_link_from_facebook(video_details: AnalyzeContentScrapeResponse) -> l
             download_urls.append(download_url)
 
     return download_urls
-def get_mp4_link_from_x(
-    video_details: AnalyzeContentScrapeResponse
-) -> list[str]:
+def get_mp4_link_from_x(video_details: list[ExtractedVideoDetails]) -> list[str | None]:
 
     x_urls = [
         video.url
-        for video in video_details.videos
+        for video in video_details
         if video.url
     ]
 

@@ -3,10 +3,7 @@ from math import log1p
 from app.Schemea.AnalyzeContentSchema import ExtractedVideoDetails
 
 
-def select_top_relevant_videos(
-    videos: list[ExtractedVideoDetails],
-    limit: int = 15,
-) -> list[ExtractedVideoDetails]:
+def select_top_relevant_videos(videos: list[ExtractedVideoDetails],limit: int = 15,) -> list[ExtractedVideoDetails]:
 
     if not videos:
         return []
