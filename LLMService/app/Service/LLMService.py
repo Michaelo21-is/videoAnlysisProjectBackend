@@ -10,7 +10,7 @@ from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoRespo
     ScrapingCompletedResponse, ScrapingStatus
 from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, AnalyzeContentPlatform, AnalyzeContentScrapeResponse, \
     ExtractedVideoDetails
-from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini
+from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini, upload_videos_urls_to_gemini
 from app.Util.CheckUrlPlatform import check_url_platform, UrlPlatform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
 from app.Util.SelectReleventVideos import select_top_relevant_videos
@@ -232,8 +232,17 @@ class LLMService:
                 exchange=rabbitmq_manager.order_analyze_content_exchange
             )
 
-
-
+    async def analyze_content_video(self, order_id: str, video_urls: list[str], platform: AnalyzeContentPlatform) -> None:
+        try:
+            if platform is not AnalyzeContentPlatform.YOUTUBE:
+                gemini_url = await asyncio.to_thread(upload_videos_urls_to_gemini, video_urls)
+        except Exception as e:
+            logger.exception("Failed to upload/analyze video: %s",e,)
+            response = AnalyzeContentScrapeResponse(
+                orderId=order_id,
+                status=ScrapingStatus.FAILED,
+                message="Failed to analyze uploaded video",
+            )
     async def analyze_video( self, analyze_video_schema: AnalyzeVideoSchema,) -> None:
         logger.info(f"Received analyze video request: {analyze_video_schema}")
         # 1. לא התקבל שום מקור וידאו

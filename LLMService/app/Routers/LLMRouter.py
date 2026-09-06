@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Query, status
 
-from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrapeResponse
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentPlatform
 from app.Schemea.DiagramSchema import DiagramCreate, DiagramNameListResponse, UserDiagramsResponse, DiagramResponse, DiagramUpdate
 from app.Service.DiagramService import DiagramService
 from app.Service.LLMService import LLMService
@@ -70,3 +70,10 @@ def delete_diagram(diagram_id: Annotated[str, Query()], user_id: Annotated[UUID,
 async def get_video_details(order_id: Annotated[int, Query()]) -> AnalyzeContentScrapeResponse:
     video_details = await LLMService.get_video_details(order_id=order_id)
     return video_details
+@router.get("/get-analyze-video-response")
+async def get_analyze_video_response(
+    order_id: Annotated[int, Query()],
+    videoUrl: Annotated[list[str], Query()],
+    platform: Annotated[AnalyzeContentPlatform, Query()],
+) -> None:
+    pass

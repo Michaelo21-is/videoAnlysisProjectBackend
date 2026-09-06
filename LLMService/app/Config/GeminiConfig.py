@@ -1,3 +1,4 @@
+import asyncio
 import os
 from app.Util.CheckUrlPlatform import UrlPlatform
 
@@ -163,3 +164,12 @@ def upload_video_url_to_gemini(
                     os.remove(path)
                 except FileNotFoundError:
                     pass
+async def upload_videos_urls_to_gemini(videos_urls: list[str]) -> list[str]:
+    gemini_files = []
+
+    for video_url in videos_urls:
+        gemini_url = await asyncio.to_thread(upload_video_url_to_gemini,video_url, None,None,)
+
+        gemini_files.append(gemini_url)
+
+    return gemini_files
