@@ -11,6 +11,7 @@ import time
 from urllib.request import urlopen, Request
 
 from app.Schemea.DiagramSchema import DiagramCreate
+from app.Schemea.AnalyzeContentSchema import AnalyzeVideoDto
 
 client = genai.Client()
 
@@ -164,12 +165,22 @@ def upload_video_url_to_gemini(
                     os.remove(path)
                 except FileNotFoundError:
                     pass
-async def upload_videos_urls_to_gemini(videos_urls: list[str]) -> list[str]:
+async def upload_videos_urls_to_gemini(video_details: AnalyzeVideoDto) -> list[dict[str, str | bool]]:
+
     gemini_files = []
 
-    for video_url in videos_urls:
-        gemini_url = await asyncio.to_thread(upload_video_url_to_gemini,video_url, None,None,)
+    for video in video_details.videos_details:
+        gemini_url = await asyncio.to_thread(
+            upload_video_url_to_gemini,
+            video.mp4_link,
+            None,
+            None,
+        )
 
-        gemini_files.append(gemini_url)
+        gemini_files.append({
+            "videoLink": video.video_url,
+            "cloudLink": gemini_url,
+            "shouldSaveDiagram": video.shouldSaveDiagram,
+        })
 
     return gemini_files

@@ -98,3 +98,20 @@ class AnalyzeContentScrapeResponse(BaseModel):
     message: str
     status: ScrapingStatus
     videos: list[ExtractedVideoDetails] = []
+
+
+class videoDetails(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    video_url: str | None = Field(alias="videoUrl")
+    mp4_link: str | None = Field(alias="videoGeminiUrl")
+    video_name: str | None = Field(alias="videoName")
+    should_save_diagram: bool | None = Field(alias="shouldSaveDiagram")
+class AnalyzeVideoDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    order_id: int = Field(alias="orderId")
+    business_context : str | None = Field(alias="businessContext")
+    business_target_audience : str | None = Field(alias="businessTargetAudience")
+    sums_of_content : SumOfContent = Field(alias="sumOfContent")
+    videos_details : list[videoDetails] = Field(alias="videosDetails")
+    platform : AnalyzeContentPlatform = Field(alias="platform")

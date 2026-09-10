@@ -1,6 +1,7 @@
 from enum import Enum
 from pydantic import BaseModel, Field
 from uuid import UUID
+
 class AnalyzeVideoStatus(str, Enum):
     PENDING = "PENDING"
     FAILED_TO_DOWNLOAD_VIDEO = "FAILED_TO_DOWNLOAD_VIDEO"
@@ -43,7 +44,7 @@ class AnalyzeVideoResponse(BaseModel):
     message: str
     status: AnalyzeVideoStatus
     video_gemini_url: str | None = None
-class ScrapingCompletedResponse(BaseModel):
+class scraping_complete_response(BaseModel):
     order_id: int
     message: str
     status: ScrapingStatus

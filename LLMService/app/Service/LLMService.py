@@ -1,4 +1,5 @@
 import json
+from uuid import UUID
 
 from app.Config.ApifyConfigAnalyzeVideo import get_tiktok_video_with_url, get_instagram_video_with_url, get_facebook_video_with_url, get_x_video_with_url
 from app.Config.ApifyConfigAnalyzeContent import search_youtube_videos, search_x_videos, search_tiktok_videos , search_instagram_videos, search_facebook_videos
@@ -9,7 +10,7 @@ from app.Config.RedisConfig import get_cache, set_cache
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
 from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, AnalyzeContentPlatform, AnalyzeContentScrapeResponse, \
-    ExtractedVideoDetails
+    ExtractedVideoDetails, AnalyzeVideoDto
 from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini, upload_videos_urls_to_gemini
 from app.Util.CheckUrlPlatform import check_url_platform, UrlPlatform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
@@ -232,14 +233,15 @@ class LLMService:
                 exchange=rabbitmq_manager.order_analyze_content_exchange
             )
 
-    async def analyze_content_video(self, order_id: str, video_urls: list[str], platform: AnalyzeContentPlatform) -> None:
+    async def analyze_content_video(self, videos_details: AnalyzeVideoDto, user_id: UUID) -> None:
         try:
-            if platform is not AnalyzeContentPlatform.YOUTUBE:
-                gemini_url = await asyncio.to_thread(upload_videos_urls_to_gemini, video_urls)
+            if videos_details.platform is not AnalyzeContentPlatform.YOUTUBE:
+                gemini_details = await asyncio.to_thread(upload_videos_urls_to_gemini, videos_details)
+                prompt
         except Exception as e:
-            logger.exception("Failed to upload/analyze video: %s",e,)
+            logger.exception("failed to upload video in to the cloud: %s",e,)
             response = AnalyzeContentScrapeResponse(
-                orderId=order_id,
+                orderId=videos_details.order_id,
                 status=ScrapingStatus.FAILED,
                 message="Failed to analyze uploaded video",
             )
