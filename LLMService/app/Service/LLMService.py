@@ -13,7 +13,7 @@ from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, AnalyzeConten
     ExtractedVideoDetails, AnalyzeVideoDto
 from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini, upload_videos_urls_to_gemini
 from app.Util.CheckUrlPlatform import check_url_platform, UrlPlatform
-from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt
+from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt, build_diagram_for_analyze_content_prompt, analyze_content_prompt
 from app.Util.SelectReleventVideos import select_top_relevant_videos
 from app.Service.DiagramService import DiagramService
 from app.Service.QueryExpansionService import query_expansion_service
@@ -237,7 +237,11 @@ class LLMService:
         try:
             if videos_details.platform is not AnalyzeContentPlatform.YOUTUBE:
                 gemini_details = await asyncio.to_thread(upload_videos_urls_to_gemini, videos_details)
-                prompt
+                for video in gemini_details:
+                    if video["shouldSaveDiagram"] is True:
+                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context
+                        , videos_details.business_target_audience,videos_details.platform, video["video_name"])
+
         except Exception as e:
             logger.exception("failed to upload video in to the cloud: %s",e,)
             response = AnalyzeContentScrapeResponse(

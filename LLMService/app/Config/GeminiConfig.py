@@ -181,6 +181,7 @@ async def upload_videos_urls_to_gemini(video_details: AnalyzeVideoDto) -> list[d
             "videoLink": video.video_url,
             "cloudLink": gemini_url,
             "shouldSaveDiagram": video.shouldSaveDiagram,
+            "videoName": video.video_name,
         })
 
     return gemini_files
