@@ -11,12 +11,11 @@ import time
 from urllib.request import urlopen, Request
 
 from app.Schemea.DiagramSchema import DiagramCreate
-from app.Schemea.AnalyzeContentSchema import AnalyzeVideoDto
+from app.Schemea.AnalyzeContentSchema import AnalyzeVideoDto, analyzeContentResponse
 
 client = genai.Client()
 
-
-def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
+def _send_video_to_gemini(video_url: str, prompt: str) -> str:
     interaction = client.interactions.create(
         model="gemini-3.6-flash",
         input=[
@@ -38,12 +37,40 @@ def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
     if not isinstance(output_text, str) or not output_text.strip():
         raise ValueError("Gemini returned an empty response")
 
+    return output_text
+
+def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
+
+
+    output_text = _send_video_to_gemini(video_url, prompt)
+
+    if not isinstance(output_text, str) or not output_text.strip():
+        raise ValueError("Gemini returned an empty response")
+
     try:
         return DiagramCreate.model_validate_json(output_text)
     except ValidationError as error:
         raise ValueError(
             "Gemini response does not match DiagramCreate"
         ) from error
+def analyze_content_save_diagram(video_url: str, prompt: str) -> analyzeContentResponse:
+
+    output_text = _send_video_to_gemini(video_url, prompt)
+    if not isinstance(output_text, str) or not output_text.strip():
+        raise ValueError("Gemini returned an empty response")
+    try:
+        return analyzeContentResponse.model_validate_json(output_text)
+    except ValidationError as error:
+        raise ValueError(
+            "Gemini response does not match analyzeContentResponse"
+        ) from error
+def analyze_content(video_url: str, prompt: str) -> str:
+
+    output_text = _send_video_to_gemini(video_url, prompt)
+    if not isinstance(output_text, str) or not output_text.strip():
+        raise ValueError("Gemini returned an empty response")
+    return output_text
+
 def upload_video_url_to_gemini(
     video_url: str,
     audio_url: str | None = None,

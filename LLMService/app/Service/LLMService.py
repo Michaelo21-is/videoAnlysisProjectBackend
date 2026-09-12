@@ -7,11 +7,12 @@ from app.Config.ApifyConfigAnalyzeContentGetMp4Link import get_mp4_link_from_x, 
 from app.Config.RabitMqConfig import (rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_ROUTING_KEY
 , SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY, ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY)
 from app.Config.RedisConfig import get_cache, set_cache
+from app.Routers.LLMRouter import create_diagram
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
 from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, AnalyzeContentPlatform, AnalyzeContentScrapeResponse, \
     ExtractedVideoDetails, AnalyzeVideoDto
-from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini, upload_videos_urls_to_gemini
+from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini, upload_videos_urls_to_gemini, analyze_content, analyze_content_save_diagram
 from app.Util.CheckUrlPlatform import check_url_platform, UrlPlatform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt, build_diagram_for_analyze_content_prompt, analyze_content_prompt
 from app.Util.SelectReleventVideos import select_top_relevant_videos
@@ -234,13 +235,35 @@ class LLMService:
             )
 
     async def analyze_content_video(self, videos_details: AnalyzeVideoDto, user_id: UUID) -> None:
+        summaries: list[str] = []
         try:
             if videos_details.platform is not AnalyzeContentPlatform.YOUTUBE:
-                gemini_details = await asyncio.to_thread(upload_videos_urls_to_gemini, videos_details)
+                gemini_details = await upload_videos_urls_to_gemini(videos_details)
+
                 for video in gemini_details:
-                    if video["shouldSaveDiagram"] is True:
+                    if video["shouldSaveDiagram"]:
                         prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context
-                        , videos_details.business_target_audience,videos_details.platform, video["video_name"])
+                        , videos_details.business_target_audience,videos_details.platform, video["videoName"])
+                        response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video["cloudLink"])
+                        await self.asyncio.to_thread(create_diagram, response.diagram, user_id)
+                        summaries.append(response.summary)
+                    else:
+                        prompt = analyze_content_prompt(videos_details.platform)
+                        response = await asyncio.to_thread(analyze_content, prompt, video["cloudLink"])
+                        await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
+                        summaries.append(response)
+            else:
+                for video in videos_details.videos_details:
+                    if video.should_save_diagram:
+                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context, videos_details.business_target_audience,
+                                                                                      videos_details.platform, video.video_name)
+                        response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video.video_url)
+                        await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
+                        summaries.append(response.summary)
+                    else:
+                        prompt = analyze_content_prompt(videos_details.platform)
+                        response = await asyncio.to_thread(analyze_content, prompt, video.video_url)
+                        summaries.append(response)
 
         except Exception as e:
             logger.exception("failed to upload video in to the cloud: %s",e,)

@@ -1,6 +1,8 @@
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.Schemea.AnalyzeVideoSchema import ScrapingStatus
+from app.Schemea.DiagramSchema import DiagramCreate
+
 
 class AnalyzeContentPlatform(str, Enum):
     YOUTUBE = "YOUTUBE"
@@ -115,3 +117,7 @@ class AnalyzeVideoDto(BaseModel):
     sums_of_content : SumOfContent = Field(alias="sumOfContent")
     videos_details : list[videoDetails] = Field(alias="videosDetails")
     platform : AnalyzeContentPlatform = Field(alias="platform")
+
+class analyzeContentResponse(BaseModel):
+    diagram: DiagramCreate
+    summary: str
