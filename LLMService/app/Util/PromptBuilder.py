@@ -1,7 +1,7 @@
 from textwrap import dedent
 
 from app.Util.CheckUrlPlatform import UrlPlatform
-from app.Schemea.AnalyzeContentSchema import AnalyzeContentPlatform
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentPlatform, SumOfContent
 
 
 def _build_business_personalization_context(business_context: str | None,
@@ -854,5 +854,229 @@ def analyze_content_prompt(platform: AnalyzeContentPlatform | None = None,) -> s
         - Do not include explanations before or after the JSON.
         - Return exactly one field: "summary".
         - "summary" must be a single string.
+        """
+    ).strip()
+def create_diagram_based_on_videos_prompt(summaries: list[str], amount_of_videos: SumOfContent, business_context: str,target_audience: str, ) -> str:
+
+    diagrams_count_map = {
+        SumOfContent.THREE: 1,
+        SumOfContent.FIVE: 2,
+        SumOfContent.SEVEN: 3,
+    }
+
+    diagrams_count = diagrams_count_map[amount_of_videos]
+
+    videos_context = "\n\n".join(
+        f"""
+        <source_video index="{index}">
+        {summary}
+        </source_video>
+        """.strip()
+        for index, summary in enumerate(summaries, start=1)
+    )
+
+    return dedent(
+        f"""
+        You are an expert short-form video strategist and storyboard designer.
+
+        The user selected {amount_of_videos.value} source videos to analyze.
+
+        Based on the selected package, you must generate exactly
+        {diagrams_count} NEW video diagram(s).
+
+        BUSINESS CONTEXT:
+
+        <business_context>
+        {business_context}
+        </business_context>
+
+        TARGET AUDIENCE:
+
+        <target_audience>
+        {target_audience}
+        </target_audience>
+
+        SOURCE VIDEO ANALYSES:
+
+        {videos_context}
+
+        YOUR TASK:
+
+        Study all provided source-video summaries together.
+
+        Identify the strongest reusable patterns across them, including:
+        - hook techniques,
+        - storytelling structure,
+        - content progression,
+        - pacing,
+        - visual patterns,
+        - demonstrations,
+        - proof techniques,
+        - attention-retention techniques,
+        - CTA strategies.
+
+        Then use these patterns as inspiration to create exactly
+        {diagrams_count} original short-form video concept(s).
+
+        Every generated video must be specifically designed around the
+        provided business context and target audience.
+
+        Do not recreate or copy any individual source video.
+
+        Combine useful patterns from the analyzed videos and adapt them into
+        new concepts that make sense for the business.
+
+        MULTIPLE DIAGRAM RULES:
+
+        - Generate exactly {diagrams_count} diagrams.
+        - Every diagram must represent a meaningfully different video concept.
+        - Do not create small variations of the same concept.
+        - Use different hooks, angles, content flows, proof strategies,
+          or CTA approaches when generating multiple diagrams.
+        - All diagrams must still serve the same business and target audience.
+
+        DIAGRAM STRUCTURE:
+
+        Allowed node types:
+        - "hook"
+        - "videoPart"
+        - "cta"
+
+        Every diagram must:
+        - Start with exactly one "hook".
+        - Contain one or more "videoPart" nodes.
+        - End with exactly one "cta".
+        - Follow chronological order.
+        - Represent a NEW planned video, not the original source videos.
+
+        NODE TEXT:
+
+        Each node should describe what should happen in the new video.
+
+        Recommended format:
+
+        "00:00-00:03 | Opens by addressing the audience's main pain point."
+
+        "00:03-00:08 | Demonstrates how the business solves the problem."
+
+        "00:08-00:14 | Shows proof or the main benefit."
+
+        "00:14-00:18 | Leads viewers toward the business-relevant CTA."
+
+        Keep each node approximately 10-30 words.
+
+        GENERATED PROMPT:
+
+        Every diagram must include a "prompt" field containing a standalone
+        production prompt for creating that video.
+
+        The prompt should include:
+        - business objective,
+        - target audience,
+        - creative angle,
+        - hook,
+        - chronological scenes,
+        - key messages,
+        - value proposition,
+        - demonstrations or proof,
+        - visual direction,
+        - on-screen text,
+        - narration style,
+        - editing pace,
+        - audio direction when relevant,
+        - CTA,
+        - useful structural patterns inspired by the analyzed videos.
+
+        ORIGINALITY:
+
+        Do not:
+        - copy exact source-video sentences,
+        - copy scripts,
+        - copy creator identity,
+        - copy branding,
+        - simply replace the source product with the user's product.
+
+        Instead:
+        understand the successful structural pattern and adapt it into an
+        original concept for this business.
+
+        LAYOUT:
+
+        Node 1:
+        x = 90
+        y = 110
+
+        Node 2:
+        x = 430
+        y = 300
+
+        Node 3:
+        x = 770
+        y = 110
+
+        Node 4:
+        x = 1110
+        y = 300
+
+        For additional nodes:
+        - Add approximately 340 to x.
+        - Alternate y between approximately 110 and 300.
+
+        Every node:
+        - width = 240
+        - height = 180
+        - zIndex = 1
+
+        Generate a unique UUID for every node and arrow.
+
+        CONNECTION RULES:
+
+        - Connect nodes chronologically.
+        - Every arrow must reference existing node UUIDs.
+        - Arrow text must contain maximum 3 words.
+
+        RETURN EXACTLY:
+
+        {{
+          "diagrams": [
+            {{
+              "name": "Original video concept name",
+              "prompt": "Standalone production prompt",
+              "private": true,
+              "nodes": [
+                {{
+                  "id": "unique UUID",
+                  "type": "hook | videoPart | cta",
+                  "text": "00:00-00:03 | Planned video beat.",
+                  "x": 90,
+                  "y": 110,
+                  "width": 240,
+                  "height": 180,
+                  "zIndex": 1
+                }}
+              ],
+              "arrows": [
+                {{
+                  "id": "unique UUID",
+                  "sourceNodeId": "existing source UUID",
+                  "targetNodeId": "existing target UUID",
+                  "text": "Builds curiosity"
+                }}
+              ]
+            }}
+          ]
+        }}
+
+        OUTPUT REQUIREMENTS:
+
+        - Return JSON only.
+        - Return exactly {diagrams_count} diagrams.
+        - Do not return Markdown.
+        - Do not wrap the result in a code block.
+        - Do not include explanations.
+        - Every diagram must match DiagramCreate.
+        - Every diagram must be original.
+        - Every diagram must use the business context and target audience.
+        - Every node and arrow must have a unique UUID.
         """
     ).strip()

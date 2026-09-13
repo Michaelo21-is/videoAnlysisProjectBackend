@@ -7,14 +7,13 @@ from app.Config.ApifyConfigAnalyzeContentGetMp4Link import get_mp4_link_from_x, 
 from app.Config.RabitMqConfig import (rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_ROUTING_KEY
 , SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY, ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY)
 from app.Config.RedisConfig import get_cache, set_cache
-from app.Routers.LLMRouter import create_diagram
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
 from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, AnalyzeContentPlatform, AnalyzeContentScrapeResponse, \
-    ExtractedVideoDetails, AnalyzeVideoDto
-from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini, upload_videos_urls_to_gemini, analyze_content, analyze_content_save_diagram
+    ExtractedVideoDetails, AnalyzeVideoDto, analyzeContentResponse
+from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini, upload_videos_urls_to_gemini, analyze_content, analyze_content_save_diagram, create_diagram_based_on_videos
 from app.Util.CheckUrlPlatform import check_url_platform, UrlPlatform
-from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt, build_diagram_for_analyze_content_prompt, analyze_content_prompt
+from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt, build_diagram_for_analyze_content_prompt, analyze_content_prompt, create_diagram_based_on_videos_prompt
 from app.Util.SelectReleventVideos import select_top_relevant_videos
 from app.Service.DiagramService import DiagramService
 from app.Service.QueryExpansionService import query_expansion_service
@@ -233,45 +232,56 @@ class LLMService:
                 routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
                 exchange=rabbitmq_manager.order_analyze_content_exchange
             )
-
+    # when user choose the videos to analyze
     async def analyze_content_video(self, videos_details: AnalyzeVideoDto, user_id: UUID) -> None:
         summaries: list[str] = []
-        try:
-            if videos_details.platform is not AnalyzeContentPlatform.YOUTUBE:
-                gemini_details = await upload_videos_urls_to_gemini(videos_details)
+        videos_analyzed_ids: list[str] = []
+        video_created_diagram_ids: list[str] = []
+        if videos_details.platform is not AnalyzeContentPlatform.YOUTUBE:
+            gemini_details = await upload_videos_urls_to_gemini(videos_details)
+            for video in gemini_details:
+                if video["shouldSaveDiagram"]:
+                    prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context
+                    , videos_details.business_target_audience,videos_details.platform, video["videoName"])
+                    response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video["cloudLink"])
+                    diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram, response.diagram, user_id)
+                    videos_analyzed_ids.append(diagram_id)
+                    summaries.append(response.summary)
+                else:
+                    prompt = analyze_content_prompt(videos_details.platform)
+                    response = await asyncio.to_thread(analyze_content, prompt, video["cloudLink"])
+                    await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
+                    summaries.append(response)
+        else:
+            for video in videos_details.videos_details:
+                if video.should_save_diagram:
+                    prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context, videos_details.business_target_audience,
+                    videos_details.platform, video.video_name)
+                    response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video.video_url)
+                    diagram_id =await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
+                    videos_analyzed_ids.append(diagram_id)
+                    summaries.append(response.summary)
+                else:
+                    prompt = analyze_content_prompt(videos_details.platform)
+                    response = await asyncio.to_thread(analyze_content, prompt, video.video_url)
+                    summaries.append(response)
+        create_video_prompt = create_diagram_based_on_videos_prompt(summaries, videos_details.sums_of_content, videos_details.business_context, videos_details.business_target_audience)
+        diagrams = await asyncio.to_thread(create_diagram_based_on_videos, create_video_prompt)
+        for diagram in diagrams:
+            video_created_diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram,diagram, user_id)
+            video_created_diagram_ids.append(video_created_diagram_id)
+        response = analyzeContentResponse(
+            analyzeVideosDiagramIds=videos_analyzed_ids,
+            createdVideosDiagramIds=video_created_diagram_ids,
+        )
+        rabbitmq_manager.publish(response, rabbitmq_manager.analyze_content_response_queue, rabbitmq_manager.analyze_content_response_exchange)
 
-                for video in gemini_details:
-                    if video["shouldSaveDiagram"]:
-                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context
-                        , videos_details.business_target_audience,videos_details.platform, video["videoName"])
-                        response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video["cloudLink"])
-                        await self.asyncio.to_thread(create_diagram, response.diagram, user_id)
-                        summaries.append(response.summary)
-                    else:
-                        prompt = analyze_content_prompt(videos_details.platform)
-                        response = await asyncio.to_thread(analyze_content, prompt, video["cloudLink"])
-                        await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
-                        summaries.append(response)
-            else:
-                for video in videos_details.videos_details:
-                    if video.should_save_diagram:
-                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context, videos_details.business_target_audience,
-                                                                                      videos_details.platform, video.video_name)
-                        response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video.video_url)
-                        await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
-                        summaries.append(response.summary)
-                    else:
-                        prompt = analyze_content_prompt(videos_details.platform)
-                        response = await asyncio.to_thread(analyze_content, prompt, video.video_url)
-                        summaries.append(response)
 
-        except Exception as e:
-            logger.exception("failed to upload video in to the cloud: %s",e,)
-            response = AnalyzeContentScrapeResponse(
-                orderId=videos_details.order_id,
-                status=ScrapingStatus.FAILED,
-                message="Failed to analyze uploaded video",
-            )
+
+
+
+
+
     async def analyze_video( self, analyze_video_schema: AnalyzeVideoSchema,) -> None:
         logger.info(f"Received analyze video request: {analyze_video_schema}")
         # 1. לא התקבל שום מקור וידאו

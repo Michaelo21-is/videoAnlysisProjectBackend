@@ -70,6 +70,7 @@ def delete_diagram(diagram_id: Annotated[str, Query()], user_id: Annotated[UUID,
 async def get_video_details(order_id: Annotated[int, Query()]) -> AnalyzeContentScrapeResponse:
     video_details = await LLMService.get_video_details(order_id=order_id)
     return video_details
+
 @router.post("/chosen-video-for-analyze-content")
 async def get_analyze_video_response( analyze_video_dto: AnalyzeVideoDto, user_id: Annotated[UUID, Header(alias="X-USER-ID")]) -> None:
-    pass
+    await LLMService.analyze_content_video(analyze_video_dto, user_id)

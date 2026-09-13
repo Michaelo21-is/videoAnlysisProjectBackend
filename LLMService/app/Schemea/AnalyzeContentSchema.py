@@ -119,5 +119,5 @@ class AnalyzeVideoDto(BaseModel):
     platform : AnalyzeContentPlatform = Field(alias="platform")
 
 class analyzeContentResponse(BaseModel):
-    diagram: DiagramCreate
-    summary: str
+    analyze_videos_diagram_ids: list[str] | None= Field(alias="analyzeVideosDiagramIds")
+    created_videos_diagram_ids: list[str] | None= Field(alias="createdVideosDiagramIds")

@@ -1,7 +1,7 @@
 import asyncio
 import os
 from app.Util.CheckUrlPlatform import UrlPlatform
-
+import json
 from google import genai
 from pydantic import ValidationError
 import shutil
@@ -40,8 +40,6 @@ def _send_video_to_gemini(video_url: str, prompt: str) -> str:
     return output_text
 
 def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
-
-
     output_text = _send_video_to_gemini(video_url, prompt)
 
     if not isinstance(output_text, str) or not output_text.strip():
@@ -54,7 +52,6 @@ def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
             "Gemini response does not match DiagramCreate"
         ) from error
 def analyze_content_save_diagram(video_url: str, prompt: str) -> analyzeContentResponse:
-
     output_text = _send_video_to_gemini(video_url, prompt)
     if not isinstance(output_text, str) or not output_text.strip():
         raise ValueError("Gemini returned an empty response")
@@ -65,17 +62,42 @@ def analyze_content_save_diagram(video_url: str, prompt: str) -> analyzeContentR
             "Gemini response does not match analyzeContentResponse"
         ) from error
 def analyze_content(video_url: str, prompt: str) -> str:
-
     output_text = _send_video_to_gemini(video_url, prompt)
     if not isinstance(output_text, str) or not output_text.strip():
         raise ValueError("Gemini returned an empty response")
     return output_text
 
-def upload_video_url_to_gemini(
-    video_url: str,
-    audio_url: str | None = None,
-    platform: UrlPlatform | None = None,
-):
+
+def create_diagram_based_on_videos(prompt: str, ) -> list[DiagramCreate]:
+
+    interaction = client.interactions.create(
+        model="gemini-3.6-flash",
+        input=[
+            {
+                "type": "text",
+                "text": prompt,
+            }
+        ],
+        store=False,
+    )
+
+    output_text = interaction.output_text
+
+    if not isinstance(output_text, str) or not output_text.strip():
+        raise ValueError("Gemini returned an empty response")
+
+    try:
+        data = json.loads(output_text)
+
+        return [
+            DiagramCreate.model_validate(diagram)
+            for diagram in data["diagrams"]
+        ]
+
+    except (json.JSONDecodeError, KeyError,TypeError, ValidationError,) as error:
+        raise ValueError("Gemini response does not match diagrams response") from error
+
+def upload_video_url_to_gemini(video_url: str, audio_url: str | None = None,platform: UrlPlatform | None = None,):
     video_path = None
     audio_path = None
     merged_path = None

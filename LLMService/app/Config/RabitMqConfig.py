@@ -73,7 +73,13 @@ ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_QUEUE = (
 )
 
 ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY = (
-    "order_analyze_content.scrape_response.routing_key"
+"order_analyze_content.scrape_response.routing_key"
+)
+ORDER_ANALYZE_CONTENT_RESPONSE_ROUTING_KEY = (
+    "order_analyze_content.response.routing_key"
+)
+ORDER_ANALYZE_CONTENT_RESPONSE_QUEUE = (
+    "order-analyze-content-response-queue"
 )
 
 
@@ -112,6 +118,11 @@ class RabbitMQManager:
         self.order_analyze_content_scrape_response_queue: (
             AbstractRobustQueue | None
         ) = None
+
+        self.analyze_content_response_queue: (
+                AbstractRobustQueue | None
+        ) = None
+
 
     async def connect(self) -> None:
         self.connection = await aio_pika.connect_robust(
@@ -208,6 +219,17 @@ class RabbitMQManager:
         await self.analyze_content_scrape_queue.bind(
             exchange=self.order_analyze_content_exchange,
             routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_ROUTING_KEY,
+        )
+        self.analyze_content_response_queue = (
+            await self.channel.declare_queue(
+                name=ORDER_ANALYZE_CONTENT_RESPONSE_QUEUE,
+                durable=True,
+            )
+        )
+
+        await self.analyze_content_response_queue.bind(
+            exchange=self.order_analyze_content_exchange,
+            routing_key=ORDER_ANALYZE_CONTENT_RESPONSE_ROUTING_KEY,
         )
 
         # =====================================================
