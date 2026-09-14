@@ -179,6 +179,22 @@ public class UserService {
                 .niche(orderAnalyzeContentDto.getNiche())
                 .build());
     }
+    @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_REFUND_REQUEST_QUEUE)
+    public void refundOderAnalyzeContent(RefundOrderDto refundOrderDto) {
+        if (refundOrderDto.getCredit() == null || refundOrderDto.getUserId() == null || refundOrderDto.getOrderId() ==null) {
+            log.info("some of the parameters are null: {}", refundOrderDto);
+            return;
+        }
+        if (limitUserRefundService.isRefundAlreadyBeingHandled(refundOrderDto.getOrderId(), LimitUserRefundService.LIMIT_USER_REFUND_ANALYZE_CONTENT_PREFIX)) {
+            log.info("Refund already handled for order id: {}", refundOrderDto.getOrderId());
+            return;
+        }
+        int addCredit = userRepository.addCredit(refundOrderDto.getUserId(), refundOrderDto.getCredit());
+        if (addCredit == 0) {
+            log.info("Failed to add credit to user with id: {}", refundOrderDto.getUserId());
+        }
+        sendToQueue.sendOrderAnalyzeContentRefundStatus(refundOrderDto.getOrderId());
+    }
     /// ***
     /// analyze content
     /// ***
@@ -186,8 +202,8 @@ public class UserService {
     /// ***
     /// order credit
     /// ***
-    @RabbitListener(queues = RabbitMqConfig.ORDER_CREDIT_QUEUE)
     @Transactional
+    @RabbitListener(queues = RabbitMqConfig.ORDER_CREDIT_QUEUE)
     public void handleOrderCredit(OrderCreditDto orderCreditDto) {
         if (orderCreditDto.getCredit() == null || orderCreditDto.getPriceInUsd() == null || orderCreditDto.getUserId() == null) {
             sendToQueue.sendOrderCreditStatus( orderCreditDto, OrderStatus.SERVER_FAILED);
@@ -217,11 +233,11 @@ public class UserService {
     /// ***
 
     /// ***
-    /// order analyze video
+    /// order to analyze video
     /// ***
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_VIDEO_QUEUE)
     public void handleOrderAnalyzeVideo(OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
-        log.info("reccived order deatils, info: {}", orderAnalyzeVideoDto);
+        log.info("received order details, info: {}", orderAnalyzeVideoDto);
         if (orderAnalyzeVideoDto.getUserId() == null || orderAnalyzeVideoDto.getCreditCost() == null || orderAnalyzeVideoDto.getOrderId() == null) {
             log.info("some of the parameters are null in handle order analyze video: \n {}", orderAnalyzeVideoDto);
             OrderVideoAnalysisStatusResponse response = OrderVideoAnalysisStatusResponse.builder()
@@ -277,24 +293,24 @@ public class UserService {
         sendToQueue.sendOrderToAnalyzeVideo(orderAnalyzeVideoResponse);
     }
     @RabbitListener(queues = RabbitMqConfig.FAILED_ANALYZE_VIDEO_QUEUE)
-    public void handleFailedAnalyzeVideo(FailedAnalyzeVideoDto failedAnalyzeVideoDto) {
-        if (failedAnalyzeVideoDto.getCredit() == null || failedAnalyzeVideoDto.getUserId() == null || failedAnalyzeVideoDto.getOrderId() ==null) {
-            log.info("some of the parameters are null: {}", failedAnalyzeVideoDto);
+    public void handleRefundAnalyzeVideo(RefundOrderDto refundOrderDto) {
+        if (refundOrderDto.getCredit() == null || refundOrderDto.getUserId() == null || refundOrderDto.getOrderId() ==null) {
+            log.info("some of the parameters are null: {}", refundOrderDto);
             return;
         }
-        if (!limitUserRefundService.tryRefundVideoAnalyze(failedAnalyzeVideoDto.getOrderId())) {
+        if (limitUserRefundService.isRefundAlreadyBeingHandled(refundOrderDto.getOrderId(), LimitUserRefundService.LIMIT_USER_REFUND_VIDEO_ANALYZE_PREFIX)) {
             log.info(
                     "Refund already handled for order id: {}",
-                    failedAnalyzeVideoDto.getOrderId()
+                    refundOrderDto.getOrderId()
             );
             return;
         }
-        int addCredit = userRepository.addCredit(failedAnalyzeVideoDto.getUserId(), failedAnalyzeVideoDto.getCredit());
+        int addCredit = userRepository.addCredit(refundOrderDto.getUserId(), refundOrderDto.getCredit());
         if (addCredit == 0) {
-            log.info("Failed to add credit to user with id: {}", failedAnalyzeVideoDto.getUserId());
+            log.info("Failed to add credit to user with id: {}", refundOrderDto.getUserId());
             return;
         }
-        sendToQueue.sendUserRefund(failedAnalyzeVideoDto.getOrderId());
+        sendToQueue.sendUserRefund(refundOrderDto.getOrderId());
     }
     /// ***
     /// order analyze video

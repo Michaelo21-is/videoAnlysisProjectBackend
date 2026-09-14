@@ -1,7 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.Schemea.AnalyzeVideoSchema import ScrapingStatus
-from app.Schemea.DiagramSchema import DiagramCreate
 
 
 class AnalyzeContentPlatform(str, Enum):
@@ -121,3 +120,6 @@ class AnalyzeVideoDto(BaseModel):
 class analyzeContentResponse(BaseModel):
     analyze_videos_diagram_ids: list[str] | None= Field(alias="analyzeVideosDiagramIds")
     created_videos_diagram_ids: list[str] | None= Field(alias="createdVideosDiagramIds")
+    order_id: int = Field(alias="orderId")
+    status: ScrapingStatus = Field(alias="status")
+    message: str = Field(alias="message")

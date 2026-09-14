@@ -23,6 +23,11 @@ public class RabbitMqConfig {
     public static final String ORDER_ANALYZE_CONTENT_SCRAPE_QUEUE = "order-analyze-content-scrape-queue";
     public static final String ORDER_ANALYZE_CONTENT_SCRAPE_ROUTING_KEY = "order_analyze_content.scrape.routing-key";
 
+    public static final String ORDER_ANALYZE_CONTENT_REFUND_REQUEST_QUEUE = "order-analyze-content-refund-request-queue";
+
+    public static final String ORDER_ANALYZE_CONTENT_REFUND_STATUS_QUEUE = "order-analyze-content-refund-status-queue";
+    public static final String ORDER_ANALYZE_CONTENT_REFUND_STATUS_ROUTING_KEY = "order_analyze_content.refundStatus.routing-key";
+
     public static final String ORDER_CREDIT_QUEUE = "order-credit-queue";
     public static final String ORDER_CREDIT_STATUS_EXCHANGE = "order-credit-status-exchange";
     public static final String ORDER_CREDIT_STATUS_ROUTING_KEY = "order_credit.analyzeOrderStatus.routing-key";
@@ -143,7 +148,25 @@ public class RabbitMqConfig {
                 .to(orderAnalyzeContentStatusExchange)
                 .with(ORDER_ANALYZE_CONTENT_SCRAPE_ROUTING_KEY);
     }
-
+    @Bean
+    public Queue orderAnalyzeContentRefundRequestQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_REFUND_REQUEST_QUEUE)
+                .build();
+    }
+    @Bean
+    public Queue orderAnalyzeContentRefundStatusQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_REFUND_STATUS_QUEUE)
+                .build();
+    }
+    @Bean
+    public Binding orderAnalyzeContentRefundStatusBinding(@Qualifier("orderAnalyzeContentRefundStatusQueue") Queue orderAnalyzeContentRefundStatusQueue, @Qualifier("orderAnalyzeContentStatusExchange") DirectExchange orderAnalyzeContentStatusExchange) {
+        return BindingBuilder
+                .bind(orderAnalyzeContentRefundStatusQueue)
+                .to(orderAnalyzeContentStatusExchange)
+                .with(ORDER_ANALYZE_CONTENT_REFUND_STATUS_ROUTING_KEY);
+    }
     @Bean
     public DirectExchange orderCreditStatusExchange() {
         return new DirectExchange(

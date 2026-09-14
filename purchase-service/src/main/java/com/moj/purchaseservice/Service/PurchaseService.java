@@ -19,7 +19,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -102,7 +101,7 @@ public class PurchaseService {
         return orderAnalyzeContents.getId();
     }
     public CheckOrderAnalyzeContentStatusResponse checkOrderAnalyzeContentStatus(UUID userId ,Long orderId) {
-        if (orderId == null) {
+        if (orderId == null || userId == null) {
             log.error("userId or orderId is null in check order analyze content status, order id: {}, user id: {}", orderId, userId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Didn't get the required details");
         }
@@ -217,6 +216,14 @@ public class PurchaseService {
         if (orderAnalyzeContentScrapingDto.getStatus().equals(ScrapingStatus.FAILED)) {
             order.setStatus(OrderAnalyzeContentStatus.FAIL_TO_SCRAPE);
             orderAnalyzeContentRepository.save(order);
+            rabbitTemplate.convertAndSend(
+                    RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE
+                    , RabbitMqConfig.ORDER_ANALYZE_CONTENT_REFUND_REQUEST_ROUTING_KEY,
+                    RefundResponse.builder()
+                            .credit(order.getCreditCost())
+                            .orderId(order.getId())
+                            .userId(order.getUserId())
+                            .build());
             sseOrderAnalyzeContentService.sendFinalStatus(OrderResponse.builder()
                     .status(Status.SERVER_FAILED)
                     .orderId(orderAnalyzeContentScrapingDto.getOrderId())
@@ -229,7 +236,51 @@ public class PurchaseService {
             sseOrderAnalyzeContentService.sendScrapingStatus(orderAnalyzeContentScrapingDto);
         }
     }
+    // after finishing analyzing content in llm service getting the diagram
+    @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_RESPONSE_QUEUE)
+    public void getAnalyzeContentResponse(AnalyzeContentResponseDto response) {
+        if (response.getOrderId() == null) {
+            log.error("order id is null in order analyze content response queue");
+            return;
+        }
+        if(response.getCreatedVideosDiagramIds() == null){
+            log.info("create video diagram id is null");
+            sseOrderAnalyzeContentService.sendFinalStatus(OrderResponse.builder()
+                    .status(Status.SERVER_FAILED)
+                    .orderId(response.getOrderId())
+                    .message("something went wrong please try refresh the page or try again later")
+                    .build());
+            return;
+        }
+        if (response.getStatus() == ScrapingStatus.FAILED) {
+            OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(response.getOrderId())
+            .orElseThrow(() -> new RuntimeException("Order not found in order analyze content response queue"));
+            rabbitTemplate.convertAndSend(
+            RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE
+            , RabbitMqConfig.ORDER_ANALYZE_CONTENT_REFUND_REQUEST_ROUTING_KEY,
+            RefundResponse.builder()
+            .credit(order.getCreditCost())
+            .orderId(order.getId())
+            .userId(order.getUserId())
+            .build());
+            sseOrderAnalyzeContentService.sendFinalStatus(OrderResponse.builder()
+                    .status(Status.SERVER_FAILED)
+                    .orderId(response.getOrderId())
+                    .message(response.getMessage())
+                    .build());
+            return;
+        }
+        // before sending for the user saving the video analyze diagram id and also the created video diagram id
+        sseOrderAnalyzeContentService.sendAnalyzeContentFinalResponse(response);
 
+    }
+    @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_REFUND_STATUS_QUEUE)
+    public void handleRefundAnalyzeContent(Long orderId) {
+        OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        order.setStatus(OrderAnalyzeContentStatus.REFUND_COMPLETED);
+        orderAnalyzeContentRepository.save(order);
+    }
     ///
     /// order analyze content
     ///
@@ -643,8 +694,8 @@ public class PurchaseService {
             order.setStatus(OrderStatus.FAIL_TO_SCRAPE);
             orderAnalyzeVideoRepository.save(order);
 
-            FailedAnalyzeVideoResponse response =
-                    FailedAnalyzeVideoResponse.builder()
+            RefundResponse response =
+                    RefundResponse.builder()
                             .userId(order.getUserId())
                             .credit(costOfOrderVideoAnalyze)
                             .orderId(order.getId())
@@ -704,8 +755,8 @@ public class PurchaseService {
                 .getStatus()
                 .equals(OrderStatus.SUCCEED)) {
 
-            FailedAnalyzeVideoResponse response =
-                    FailedAnalyzeVideoResponse.builder()
+            RefundResponse response =
+                    RefundResponse.builder()
                             .userId(order.getUserId())
                             .credit(costOfOrderVideoAnalyze)
                             .orderId(order.getId())

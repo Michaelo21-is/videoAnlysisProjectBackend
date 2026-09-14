@@ -7,15 +7,17 @@ import java.time.Duration;
 
 @Service
 public class LimitUserRefundService {
-    private static final String LIMIT_USER_REFUND_VIDEO_ANALYZE_PREFIX = "user:refund:analyze-video:";
-    private static final Duration LIMIT_USER_REFUND_VIDEO_ANALYZE_DURATION = Duration.ofMinutes(1);
+    public static final String LIMIT_USER_REFUND_VIDEO_ANALYZE_PREFIX = "user:refund:analyze-video:";
+    public static final String LIMIT_USER_REFUND_ANALYZE_CONTENT_PREFIX = "user:refund:analyze-content:";
+    private static final Duration LIMIT_USER_REFUND_VIDEO_ANALYZE_DURATION = Duration.ofMinutes(5);
 
-    private StringRedisTemplate redis;
+    private final StringRedisTemplate redis;
     public LimitUserRefundService(StringRedisTemplate redis) {
         this.redis = redis;
     }
-    public boolean tryRefundVideoAnalyze(Long orderId) {
-        String key = LIMIT_USER_REFUND_VIDEO_ANALYZE_PREFIX + orderId;
+
+    public boolean isRefundAlreadyBeingHandled(Long orderId, String prefix) {
+        String key = prefix + orderId;
 
         Boolean inserted = redis.opsForValue().setIfAbsent(
                 key,
@@ -23,6 +25,6 @@ public class LimitUserRefundService {
                 LIMIT_USER_REFUND_VIDEO_ANALYZE_DURATION
         );
 
-        return Boolean.TRUE.equals(inserted);
+        return !Boolean.TRUE.equals(inserted);
     }
 }

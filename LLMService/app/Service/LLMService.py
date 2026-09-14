@@ -232,52 +232,78 @@ class LLMService:
                 routing_key=ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
                 exchange=rabbitmq_manager.order_analyze_content_exchange
             )
-    # when user choose the videos to analyze
+    # when user choosing the videos to analyze
     async def analyze_content_video(self, videos_details: AnalyzeVideoDto, user_id: UUID) -> None:
         summaries: list[str] = []
         videos_analyzed_ids: list[str] = []
         video_created_diagram_ids: list[str] = []
-        if videos_details.platform is not AnalyzeContentPlatform.YOUTUBE:
-            gemini_details = await upload_videos_urls_to_gemini(videos_details)
-            for video in gemini_details:
-                if video["shouldSaveDiagram"]:
-                    prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context
-                    , videos_details.business_target_audience,videos_details.platform, video["videoName"])
-                    response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video["cloudLink"])
-                    diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram, response.diagram, user_id)
-                    videos_analyzed_ids.append(diagram_id)
-                    summaries.append(response.summary)
-                else:
-                    prompt = analyze_content_prompt(videos_details.platform)
-                    response = await asyncio.to_thread(analyze_content, prompt, video["cloudLink"])
-                    await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
-                    summaries.append(response)
-        else:
-            for video in videos_details.videos_details:
-                if video.should_save_diagram:
-                    prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context, videos_details.business_target_audience,
-                    videos_details.platform, video.video_name)
-                    response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video.video_url)
-                    diagram_id =await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
-                    videos_analyzed_ids.append(diagram_id)
-                    summaries.append(response.summary)
-                else:
-                    prompt = analyze_content_prompt(videos_details.platform)
-                    response = await asyncio.to_thread(analyze_content, prompt, video.video_url)
-                    summaries.append(response)
-        create_video_prompt = create_diagram_based_on_videos_prompt(summaries, videos_details.sums_of_content, videos_details.business_context, videos_details.business_target_audience)
-        diagrams = await asyncio.to_thread(create_diagram_based_on_videos, create_video_prompt)
-        for diagram in diagrams:
-            video_created_diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram,diagram, user_id)
-            video_created_diagram_ids.append(video_created_diagram_id)
-        response = analyzeContentResponse(
-            analyzeVideosDiagramIds=videos_analyzed_ids,
-            createdVideosDiagramIds=video_created_diagram_ids,
-        )
-        rabbitmq_manager.publish(response, rabbitmq_manager.analyze_content_response_queue, rabbitmq_manager.analyze_content_response_exchange)
+        current_stage = "scraping data"
 
+        try:
+            if videos_details.platform is not AnalyzeContentPlatform.YOUTUBE:
+                current_stage = "uploading videos to gemini"
+                gemini_details = await upload_videos_urls_to_gemini(videos_details)
+                current_stage = "analyzing videos"
+                for video in gemini_details:
+                    if video["shouldSaveDiagram"]:
+                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context
+                        , videos_details.business_target_audience,videos_details.platform, video["videoName"])
+                        response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video["cloudLink"])
 
+                        current_stage = "saving analyzed video diagram"
+                        diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram, response.diagram, user_id)
+                        videos_analyzed_ids.append(diagram_id)
+                        summaries.append(response.summary)
+                    else:
+                        prompt = analyze_content_prompt(videos_details.platform)
+                        current_stage="analyzing video without creating diagram"
+                        response = await asyncio.to_thread(analyze_content, prompt, video["cloudLink"])
+                        summaries.append(response)
+            else:
+                current_stage = "analyzing youtube videos"
+                for video in videos_details.videos_details:
+                    if video.should_save_diagram:
+                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context, videos_details.business_target_audience,
+                        videos_details.platform, video.video_name)
+                        current_stage = "analyzing youtube video then save it to diagram"
+                        response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video.video_url)
+                        current_stage = "saving analyzed video diagram"
+                        diagram_id =await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
+                        videos_analyzed_ids.append(diagram_id)
+                        summaries.append(response.summary)
+                    else:
+                        current_stage = "analyzing youtube video without creating diagram"
+                        prompt = analyze_content_prompt(videos_details.platform)
+                        response = await asyncio.to_thread(analyze_content, prompt, video.video_url)
+                        summaries.append(response)
 
+            create_video_prompt = create_diagram_based_on_videos_prompt(summaries, videos_details.sums_of_content, videos_details.business_context, videos_details.business_target_audience)
+            current_stage = "creating diagrams from videos"
+            diagrams = await asyncio.to_thread(create_diagram_based_on_videos, create_video_prompt)
+            current_stage = "saving created diagrams"
+            for diagram in diagrams:
+                video_created_diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram,diagram, user_id)
+                video_created_diagram_ids.append(video_created_diagram_id)
+            response = analyzeContentResponse(
+                analyzeVideosDiagramIds=videos_analyzed_ids,
+                createdVideosDiagramIds=video_created_diagram_ids,
+                message="Videos analyzed successfully",
+                orderId=videos_details.order_id,
+                status=ScrapingStatus.SUCCEED.value,
+            )
+            rabbitmq_manager.publish(response, rabbitmq_manager.analyze_content_response_queue, rabbitmq_manager.analyze_content_response_exchange)
+        except Exception as e:
+            logger.exception("Failed to analyze content video. order_id=%s stage=%s error=%s", videos_details.order_id,
+                             current_stage, e)
+            response = analyzeContentResponse(
+                analyzeVideosDiagramIds=videos_analyzed_ids,
+                createdVideosDiagramIds=video_created_diagram_ids,
+                message="Failed to analyze content video. Your credits will be refunded, please try again later.",
+                orderId=videos_details.order_id,
+                status=ScrapingStatus.FAILED.value,
+            )
+
+            rabbitmq_manager.publish(response, rabbitmq_manager.analyze_content_response_queue, rabbitmq_manager.analyze_content_response_exchange)
 
 
 

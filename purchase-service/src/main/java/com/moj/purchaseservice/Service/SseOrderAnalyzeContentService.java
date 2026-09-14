@@ -1,5 +1,6 @@
 package com.moj.purchaseservice.Service;
 
+import com.moj.purchaseservice.Dto.AnalyzeContentResponseDto;
 import com.moj.purchaseservice.Dto.OderAnalyzeContentScrapingDto;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
@@ -118,6 +119,29 @@ public class SseOrderAnalyzeContentService {
                     SseEmitter.event()
                             .id(response.getOrderId().toString())
                             .name("order-analyze-content-failed")
+                            .data(response)
+            );
+
+            emitter.complete();
+
+        } catch (IOException | IllegalStateException exception) {
+            emitter.completeWithError(exception);
+        }
+    }
+
+    public void sendAnalyzeContentFinalResponse(AnalyzeContentResponseDto response){
+
+        SseEmitter emitter = emitters.remove(response.getOrderId());
+
+        if (emitter == null) {
+            return;
+        }
+
+        try {
+            emitter.send(
+                    SseEmitter.event()
+                            .id(response.getOrderId().toString())
+                            .name("finish analyzing content")
                             .data(response)
             );
 

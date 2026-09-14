@@ -27,6 +27,13 @@ public class SendToQueue {
                 response
         );
     }
+    public void sendOrderAnalyzeContentRefundStatus(Long orderId) {
+        rabbitTemplate.convertAndSend(
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE,
+                RabbitMqConfig.ORDER_ANALYZE_CONTENT_REFUND_STATUS_ROUTING_KEY,
+                orderId
+        );
+    }
     public void sendOrderAnalyzeContentToScrape(OrderAnalyzeContentScrapeResponse response) {
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE,

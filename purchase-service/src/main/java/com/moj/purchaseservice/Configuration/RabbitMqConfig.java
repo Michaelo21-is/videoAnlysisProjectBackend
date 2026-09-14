@@ -23,6 +23,13 @@ public class RabbitMqConfig {
 
     public static final String ORDER_ANALYZE_CONTENT_STATUS_QUEUE = "order-analyze-content-status-queue";
 
+    public static final String ORDER_ANALYZE_CONTENT_RESPONSE_QUEUE = "order-analyze-content-response-queue";
+
+    public static final String ORDER_ANALYZE_CONTENT_REFUND_REQUEST_QUEUE = "order-analyze-content-refund-request-queue";
+    public static final String ORDER_ANALYZE_CONTENT_REFUND_REQUEST_ROUTING_KEY = "order_analyze_content.refund_request.routing_key";
+
+    public static final String ORDER_ANALYZE_CONTENT_REFUND_STATUS_QUEUE = "order-analyze-content-refund-status-queue";
+
     public static final String ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_QUEUE = "order-analyze-content-scrape-response-queue";
     public static final String ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY = "order_analyze_content.scrape_response.routing_key";
 
@@ -194,12 +201,22 @@ public class RabbitMqConfig {
                 .with(FAILED_ANALYZE_VIDEO_ROUTING_KEY);
     }
 
+
+
     @Bean
     public Queue orderAnalyzeContentStatusQueue() {
         return QueueBuilder
                 .durable(ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
                 .build();
     }
+
+    @Bean
+    public Queue orderAnalyzeContentResponseQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_RESPONSE_QUEUE)
+                .build();
+    }
+
     @Bean
     public Queue orderAnalyzeContentScrapeResponseQueue() {
         return QueueBuilder
@@ -216,6 +233,30 @@ public class RabbitMqConfig {
                 .bind(queue)
                 .to(exchange)
                 .with(ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue orderAnalyzeContentRefundRequestQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_REFUND_REQUEST_QUEUE)
+                .build();
+    }
+
+    @Bean
+    public Binding orderAnalyzeContentRefundRequestBinding(
+            @Qualifier("orderAnalyzeContentRefundRequestQueue") Queue queue,
+            @Qualifier("orderAnalyzeContentExchange") DirectExchange exchange
+    ){
+        return BindingBuilder
+                .bind(queue)
+                .to(exchange)
+                .with(ORDER_ANALYZE_CONTENT_REFUND_REQUEST_ROUTING_KEY);
+    }
+    @Bean
+    public Queue orderAnalyzeContentRefundStatusQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_REFUND_STATUS_QUEUE)
+                .build();
     }
 
     @Bean
