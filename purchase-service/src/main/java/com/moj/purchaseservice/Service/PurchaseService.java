@@ -2,9 +2,11 @@ package com.moj.purchaseservice.Service;
 
 import com.moj.purchaseservice.Configuration.RabbitMqConfig;
 import com.moj.purchaseservice.Dto.*;
+import com.moj.purchaseservice.Entity.DiagramDetailsForAnalyzeContent;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Entity.OrderAnalyzeVideo;
 import com.moj.purchaseservice.Entity.OrderCredit;
+import com.moj.purchaseservice.Repository.DiagramDetailsForAnalyzeContentRepository;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
 import com.moj.purchaseservice.Repository.OrderAnalyzeVideoRepository;
 import com.moj.purchaseservice.Repository.OrderCreditRepository;
@@ -22,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -39,6 +43,7 @@ public class PurchaseService {
     private final Long costOfOrderVideoAnalyze;
     private final SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService;
     private final FileService fileService;
+    private final DiagramDetailsForAnalyzeContentRepository diagramDetailsForAnalyzeContentRepository;
 
     public PurchaseService(
             OrderAnalyzeContentsRepository orderAnalyzeContentRepository,
@@ -50,7 +55,8 @@ public class PurchaseService {
             @Value("${video-analysis.credit-cost}") Long costOfOrderVideoAnalyze,
             OrderAnalyzeVideoRepository orderAnalyzeVideoRepository,
             SseOrderAnalyzeVideoService sseOrderAnalyzeVideoService,
-            FileService fileService, ContentPricingCalculator contentPricingCalculator
+            FileService fileService, ContentPricingCalculator contentPricingCalculator,
+            DiagramDetailsForAnalyzeContentRepository diagramDetailsForAnalyzeContentRepository
     ) {
         this.orderAnalyzeContentRepository = orderAnalyzeContentRepository;
         this.rabbitTemplate = rabbitTemplate;
@@ -63,6 +69,7 @@ public class PurchaseService {
         this.sseOrderAnalyzeVideoService = sseOrderAnalyzeVideoService;
         this.fileService = fileService;
         this.contentPricingCalculator = contentPricingCalculator;
+        this.diagramDetailsForAnalyzeContentRepository = diagramDetailsForAnalyzeContentRepository;
     }
 
     /// ***
@@ -243,18 +250,9 @@ public class PurchaseService {
             log.error("order id is null in order analyze content response queue");
             return;
         }
-        if(response.getCreatedVideosDiagramIds() == null){
-            log.info("create video diagram id is null");
-            sseOrderAnalyzeContentService.sendFinalStatus(OrderResponse.builder()
-                    .status(Status.SERVER_FAILED)
-                    .orderId(response.getOrderId())
-                    .message("something went wrong please try refresh the page or try again later")
-                    .build());
-            return;
-        }
+        OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(response.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found in order analyze content response queue"));
         if (response.getStatus() == ScrapingStatus.FAILED) {
-            OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(response.getOrderId())
-            .orElseThrow(() -> new RuntimeException("Order not found in order analyze content response queue"));
             rabbitTemplate.convertAndSend(
             RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE
             , RabbitMqConfig.ORDER_ANALYZE_CONTENT_REFUND_REQUEST_ROUTING_KEY,
@@ -270,6 +268,33 @@ public class PurchaseService {
                     .build());
             return;
         }
+        List<DiagramDetailsForAnalyzeContent> diagrams = new ArrayList<>();
+
+        for (AnalyzeContentResponseDto.VideoDetails videoDetails : response.getCreatedVideos()) {
+
+            DiagramDetailsForAnalyzeContent diagram =
+                    new DiagramDetailsForAnalyzeContent();
+
+            diagram.setDiagramId(videoDetails.getDiagramId());
+            diagram.setVideoName(videoDetails.getVideoName());
+            diagram.setVideoDiagramType(VideoDiagramType.GENERATED_VIDEO);
+
+            diagrams.add(diagram);
+        }
+
+        for (AnalyzeContentResponseDto.VideoDetails videoDetails : response.getAnalyzedVideos()) {
+
+            DiagramDetailsForAnalyzeContent diagram =
+                    new DiagramDetailsForAnalyzeContent();
+
+            diagram.setDiagramId(videoDetails.getDiagramId());
+            diagram.setVideoName(videoDetails.getVideoName());
+            diagram.setVideoDiagramType(VideoDiagramType.ANALYZED_VIDEO);
+
+            diagrams.add(diagram);
+        }
+        order.setDiagrams(diagrams);
+        orderAnalyzeContentRepository.save(order);
         // before sending for the user saving the video analyze diagram id and also the created video diagram id
         sseOrderAnalyzeContentService.sendAnalyzeContentFinalResponse(response);
 

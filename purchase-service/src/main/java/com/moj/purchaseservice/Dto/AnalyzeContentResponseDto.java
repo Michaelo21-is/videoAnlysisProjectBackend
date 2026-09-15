@@ -11,9 +11,19 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class AnalyzeContentResponseDto {
-    private List<String> analyzeVideosDiagramIds;
-    private List<String> createdVideosDiagramIds;
+
+    private List<VideoDetails> analyzedVideos;
+    private List<VideoDetails> createdVideos;
+
     private Long orderId;
     private ScrapingStatus status;
     private String message;
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class VideoDetails {
+        private String diagramId;
+        private String videoName;
+    }
 }

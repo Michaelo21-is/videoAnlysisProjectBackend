@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -51,7 +52,10 @@ public class OrderAnalyzeContents {
     @Column(name = "niche", nullable = false)
     private String niche;
 
-    
+    @OneToMany( cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "order_id")
+    private List<DiagramDetailsForAnalyzeContent> diagrams;
+
 
     @Column(name = "purchased_at")
     private Instant purchasedAt;
