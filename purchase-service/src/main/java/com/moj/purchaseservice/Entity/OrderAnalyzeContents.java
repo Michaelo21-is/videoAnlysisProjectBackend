@@ -51,6 +51,8 @@ public class OrderAnalyzeContents {
     @Column(name = "niche", nullable = false)
     private String niche;
 
+    
+
     @Column(name = "purchased_at")
     private Instant purchasedAt;
 

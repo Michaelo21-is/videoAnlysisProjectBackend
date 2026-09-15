@@ -117,9 +117,19 @@ class AnalyzeVideoDto(BaseModel):
     videos_details : list[videoDetails] = Field(alias="videosDetails")
     platform : AnalyzeContentPlatform = Field(alias="platform")
 
+class AnalyzeVideoDetails(BaseModel):
+    video_name : str | None = Field(alias="videoName")
+    diagram_id : str | None = Field(alias="diagramId")
+
+class analyzeVideoDetails(BaseModel):
+    video_name : str | None = Field(alias="videoName")
+    diagram_id : str | None = Field(alias="diagramId")
+class createVideoDetails(BaseModel):
+    video_name : str | None = Field(alias="videoName")
+    diagram_id : str | None = Field(alias="diagramId")
 class analyzeContentResponse(BaseModel):
-    analyze_videos_diagram_ids: list[str] | None= Field(alias="analyzeVideosDiagramIds")
-    created_videos_diagram_ids: list[str] | None= Field(alias="createdVideosDiagramIds")
+    analyze_video_details: list[analyzeVideoDetails] | None= Field(alias="analyzeVideosDiagramIds")
+    create_video_details: list[createVideoDetails] | None= Field(alias="createdVideosDiagramIds")
     order_id: int = Field(alias="orderId")
     status: ScrapingStatus = Field(alias="status")
     message: str = Field(alias="message")
