@@ -10,7 +10,7 @@ from app.Config.RedisConfig import get_cache, set_cache
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
 from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, AnalyzeContentPlatform, AnalyzeContentScrapeResponse, \
-    ExtractedVideoDetails, AnalyzeVideoDto, analyzeContentResponse
+    ExtractedVideoDetails, AnalyzeVideoDto, analyzeContentResponse, diagramDetails
 from app.Config.GeminiConfig import analyze_video_url, upload_video_url_to_gemini, upload_videos_urls_to_gemini, analyze_content, analyze_content_save_diagram, create_diagram_based_on_videos
 from app.Util.CheckUrlPlatform import check_url_platform, UrlPlatform
 from app.Util.PromptBuilder import build_video_url_analysis_prompt, build_video_file_analysis_prompt, build_diagram_for_analyze_content_prompt, analyze_content_prompt, create_diagram_based_on_videos_prompt
@@ -235,8 +235,8 @@ class LLMService:
     # when user choosing the videos to analyze
     async def analyze_content_video(self, videos_details: AnalyzeVideoDto, user_id: UUID) -> None:
         summaries: list[str] = []
-        videos_analyzed_ids: list[str] = []
-        video_created_diagram_ids: list[str] = []
+        videos_analyzed: list[diagramDetails] =[]
+        video_created_diagram: list[diagramDetails] = []
         current_stage = "scraping data"
 
         try:
@@ -252,7 +252,12 @@ class LLMService:
 
                         current_stage = "saving analyzed video diagram"
                         diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram, response.diagram, user_id)
-                        videos_analyzed_ids.append(diagram_id)
+                        videos_analyzed.append(
+                            diagramDetails(
+                                videoName=video["videoName"],
+                                diagramId=diagram_id,
+                            )
+                        )
                         summaries.append(response.summary)
                     else:
                         prompt = analyze_content_prompt(videos_details.platform)
@@ -269,7 +274,12 @@ class LLMService:
                         response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video.video_url)
                         current_stage = "saving analyzed video diagram"
                         diagram_id =await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
-                        videos_analyzed_ids.append(diagram_id)
+                        videos_analyzed.append(
+                            diagramDetails(
+                                videoName=video["videoName"],
+                                diagramId=diagram_id,
+                            )
+                        )
                         summaries.append(response.summary)
                     else:
                         current_stage = "analyzing youtube video without creating diagram"
@@ -283,10 +293,15 @@ class LLMService:
             current_stage = "saving created diagrams"
             for diagram in diagrams:
                 video_created_diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram,diagram, user_id)
-                video_created_diagram_ids.append(video_created_diagram_id)
+                video_created_diagram.append(
+                    diagramDetails(
+                        videoName=diagram.name,
+                        diagramId=video_created_diagram_id,
+                    )
+                )
             response = analyzeContentResponse(
-                analyzeVideosDiagramIds=videos_analyzed_ids,
-                createdVideosDiagramIds=video_created_diagram_ids,
+                analyzeVideosDiagramIds=videos_analyzed,
+                createdVideosDiagramIds=video_created_diagram,
                 message="Videos analyzed successfully",
                 orderId=videos_details.order_id,
                 status=ScrapingStatus.SUCCEED.value,
@@ -296,8 +311,8 @@ class LLMService:
             logger.exception("Failed to analyze content video. order_id=%s stage=%s error=%s", videos_details.order_id,
                              current_stage, e)
             response = analyzeContentResponse(
-                analyzeVideosDiagramIds=videos_analyzed_ids,
-                createdVideosDiagramIds=video_created_diagram_ids,
+                analyzeVideosDiagramIds=videos_analyzed,
+                createdVideosDiagramIds=video_created_diagram,
                 message="Failed to analyze content video. Your credits will be refunded, please try again later.",
                 orderId=videos_details.order_id,
                 status=ScrapingStatus.FAILED.value,
