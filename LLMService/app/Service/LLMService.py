@@ -5,7 +5,8 @@ from app.Config.ApifyConfigAnalyzeVideo import get_tiktok_video_with_url, get_in
 from app.Config.ApifyConfigAnalyzeContent import search_youtube_videos, search_x_videos, search_tiktok_videos , search_instagram_videos, search_facebook_videos
 from app.Config.ApifyConfigAnalyzeContentGetMp4Link import get_mp4_link_from_x, get_mp4_link_from_facebook
 from app.Config.RabitMqConfig import (rabbitmq_manager, ANALYZE_VIDEO_RESPONSE_ROUTING_KEY
-, SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY, ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY)
+, SCRAPING_ANALYZE_VIDEO_FINISHED_ROUTING_KEY, ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY,
+ORDER_ANALYZE_CONTENT_RESPONSE_ROUTING_KEY)
 from app.Config.RedisConfig import get_cache, set_cache
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema, AnalyzeVideoResponse, AnalyzeVideoStatus, \
     ScrapingCompletedResponse, ScrapingStatus
@@ -233,7 +234,7 @@ class LLMService:
                 exchange=rabbitmq_manager.order_analyze_content_exchange
             )
     # when user choosing the videos to analyze
-    async def analyze_content_video(self, videos_details: AnalyzeVideoDto, user_id: UUID) -> None:
+    async def analyze_content_video(self, videos_details: AnalyzeVideoDto) -> None:
         summaries: list[str] = []
         videos_analyzed: list[diagramDetails] =[]
         video_created_diagram: list[diagramDetails] = []
@@ -251,7 +252,7 @@ class LLMService:
                         response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video["cloudLink"])
 
                         current_stage = "saving analyzed video diagram"
-                        diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram, response.diagram, user_id)
+                        diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram, response.diagram, videos_details.user_id,)
                         videos_analyzed.append(
                             diagramDetails(
                                 videoName=video["videoName"],
@@ -273,10 +274,10 @@ class LLMService:
                         current_stage = "analyzing youtube video then save it to diagram"
                         response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video.video_url)
                         current_stage = "saving analyzed video diagram"
-                        diagram_id =await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,user_id,)
+                        diagram_id =await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,videos_details.user_id,)
                         videos_analyzed.append(
                             diagramDetails(
-                                videoName=video["videoName"],
+                                videoName=video.video_name,
                                 diagramId=diagram_id,
                             )
                         )
@@ -287,12 +288,12 @@ class LLMService:
                         response = await asyncio.to_thread(analyze_content, prompt, video.video_url)
                         summaries.append(response)
 
-            create_video_prompt = create_diagram_based_on_videos_prompt(summaries, videos_details.sums_of_content, videos_details.business_context, videos_details.business_target_audience)
+            create_video_prompt = create_diagram_based_on_videos_prompt(summaries, videos_details.sum_of_content, videos_details.business_context, videos_details.business_target_audience)
             current_stage = "creating diagrams from videos"
             diagrams = await asyncio.to_thread(create_diagram_based_on_videos, create_video_prompt)
             current_stage = "saving created diagrams"
             for diagram in diagrams:
-                video_created_diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram,diagram, user_id)
+                video_created_diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram,diagram, videos_details.user_id,)
                 video_created_diagram.append(
                     diagramDetails(
                         videoName=diagram.name,
@@ -300,25 +301,33 @@ class LLMService:
                     )
                 )
             response = analyzeContentResponse(
-                analyzeVideosDiagramIds=videos_analyzed,
-                createdVideosDiagramIds=video_created_diagram,
+                analyzedVideos=videos_analyzed,
+                createdVideos=video_created_diagram,
                 message="Videos analyzed successfully",
                 orderId=videos_details.order_id,
-                status=ScrapingStatus.SUCCEED.value,
+                status=ScrapingStatus.SUCCEED,
             )
-            rabbitmq_manager.publish(response, rabbitmq_manager.analyze_content_response_queue, rabbitmq_manager.analyze_content_response_exchange)
+            await rabbitmq_manager.publish(
+                response=response,
+                routing_key=ORDER_ANALYZE_CONTENT_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_content_exchange,
+            )
         except Exception as e:
             logger.exception("Failed to analyze content video. order_id=%s stage=%s error=%s", videos_details.order_id,
                              current_stage, e)
             response = analyzeContentResponse(
-                analyzeVideosDiagramIds=videos_analyzed,
-                createdVideosDiagramIds=video_created_diagram,
+                analyzedVideos=videos_analyzed,
+                createdVideos=video_created_diagram,
                 message="Failed to analyze content video. Your credits will be refunded, please try again later.",
                 orderId=videos_details.order_id,
-                status=ScrapingStatus.FAILED.value,
+                status=ScrapingStatus.FAILED,
             )
 
-            rabbitmq_manager.publish(response, rabbitmq_manager.analyze_content_response_queue, rabbitmq_manager.analyze_content_response_exchange)
+            await rabbitmq_manager.publish(
+                response=response,
+                routing_key=ORDER_ANALYZE_CONTENT_RESPONSE_ROUTING_KEY,
+                exchange=rabbitmq_manager.order_analyze_content_exchange,
+            )
 
 
 

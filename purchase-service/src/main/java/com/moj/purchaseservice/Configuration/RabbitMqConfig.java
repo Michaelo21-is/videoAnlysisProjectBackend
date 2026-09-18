@@ -30,6 +30,9 @@ public class RabbitMqConfig {
 
     public static final String ORDER_ANALYZE_CONTENT_REFUND_STATUS_QUEUE = "order-analyze-content-refund-status-queue";
 
+    public static final String ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_QUEUE = "order-analyze-content-user-chose-videos-queue";
+    public static final String ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_ROUTING_KEY = "order_analyze_content.user_chose_videos.routing_key";
+
     public static final String ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_QUEUE = "order-analyze-content-scrape-response-queue";
     public static final String ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY = "order_analyze_content.scrape_response.routing_key";
 
@@ -234,7 +237,22 @@ public class RabbitMqConfig {
                 .to(exchange)
                 .with(ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY);
     }
-
+    @Bean
+    public Queue orderAnalyzeContentUserChoseVideosQueue() {
+        return QueueBuilder
+                .durable(ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_QUEUE)
+                .build();
+    }
+    @Bean
+    public Binding orderAnalyzeContentUserChoseVideosBinding(
+            @Qualifier("orderAnalyzeContentUserChoseVideosQueue") Queue queue,
+            @Qualifier("orderAnalyzeContentExchange") DirectExchange exchange
+    ){
+        return BindingBuilder
+                .bind(queue)
+                .to(exchange)
+                .with(ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_ROUTING_KEY);
+    }
     @Bean
     public Queue orderAnalyzeContentRefundRequestQueue() {
         return QueueBuilder

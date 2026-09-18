@@ -20,6 +20,9 @@ async def lifespan(_app: FastAPI):
     await rabbitmq_manager.consume_analyze_content_scrape(
         llm_service.analyze_content_scrape
     )
+    await rabbitmq_manager.consume_order_analyze_content_user_chose_videos(
+        llm_service.analyze_content_video
+    )
     try:
         yield
     finally:

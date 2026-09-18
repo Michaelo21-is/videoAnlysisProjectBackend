@@ -158,22 +158,36 @@ public class PurchaseService {
                         .totalContent(sumOfVideos)
                         .build();
             }
-            case ANALYZE_CONTENT_COMPLETED -> {
-                return CheckOrderAnalyzeContentStatusResponse.builder()
-                        .message("Order analyze content scraping completed successfully")
-                        .status(OrderAnalyzeContentStatusResponse.ANALYZING_VIDEOS_COMPLETED)
-                        .niche(order.getNiche())
-                        .platform(order.getPlatform())
-                        .totalContent(sumOfVideos)
-                        .build();
-            }
+
             case SUCCEED -> {
+
+                List<CheckOrderAnalyzeContentStatusResponse.VideoDetails> analyzedVideos = new ArrayList<>();
+                List<CheckOrderAnalyzeContentStatusResponse.VideoDetails> createdVideos = new ArrayList<>();
+
+                order.getDiagrams().forEach(diagram -> {
+
+                    CheckOrderAnalyzeContentStatusResponse.VideoDetails videoDetails =
+                            CheckOrderAnalyzeContentStatusResponse.VideoDetails.builder()
+                                    .diagramId(diagram.getDiagramId())
+                                    .videoName(diagram.getVideoName())
+                                    .build();
+
+                    if (diagram.getVideoDiagramType() == VideoDiagramType.ANALYZED_VIDEO) {
+                        analyzedVideos.add(videoDetails);
+                    }
+                    else if (diagram.getVideoDiagramType() == VideoDiagramType.GENERATED_VIDEO) {
+                        createdVideos.add(videoDetails);
+                    }
+                });
+
                 return CheckOrderAnalyzeContentStatusResponse.builder()
                         .message("complete analyze content successfully")
                         .status(OrderAnalyzeContentStatusResponse.GENERATING_RESPONSE)
                         .niche(order.getNiche())
                         .platform(order.getPlatform())
                         .totalContent(sumOfVideos)
+                        .analyzedVideo(analyzedVideos)
+                        .createdVideo(createdVideos)
                         .build();
             }
             default -> {
@@ -185,7 +199,7 @@ public class PurchaseService {
         }
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_STATUS_QUEUE)
-    public void analyzeContentStatus(OrderAnalyzeContentStatusDto orderAnalyzeContentStatusDto) {
+    public void analyzeContentPurchaseStatus(OrderAnalyzeContentStatusDto orderAnalyzeContentStatusDto) {
         if (orderAnalyzeContentStatusDto.getStatus() == null || orderAnalyzeContentStatusDto.getOrderId() == null) {
             log.error("some of the parameters are null in order analyze content status queue,\n" +
                     " order id: {}, status: {}", orderAnalyzeContentStatusDto.getOrderId(), orderAnalyzeContentStatusDto.getStatus());
@@ -243,6 +257,21 @@ public class PurchaseService {
             sseOrderAnalyzeContentService.sendScrapingStatus(orderAnalyzeContentScrapingDto);
         }
     }
+    public void handleAnalyzedContentVideoPicked(ChooseVideosAnalyzeContentDto chooseVideosAnalyzeContentDto, UUID userId) {
+        chooseVideosAnalyzeContentDto.setUserId(userId);
+        OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(chooseVideosAnalyzeContentDto.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found by id: " + chooseVideosAnalyzeContentDto.getOrderId()));
+        if (order.getStatus() == OrderAnalyzeContentStatus.SCRAPING_COMPLETED){
+            order.setStatus(OrderAnalyzeContentStatus.PICKUP_VIDEOS_COMPLETED);
+            orderAnalyzeContentRepository.save(order);
+            rabbitTemplate.convertAndSend(RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE, RabbitMqConfig.ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_ROUTING_KEY,chooseVideosAnalyzeContentDto);
+        }
+        else{
+            log.info("the current step should not analyze videos, order id: {}, order status: {}", order.getId(), order.getStatus());
+        }
+
+    }
+
     // after finishing analyzing content in llm service getting the diagram
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_RESPONSE_QUEUE)
     public void getAnalyzeContentResponse(AnalyzeContentResponseDto response) {
@@ -253,6 +282,8 @@ public class PurchaseService {
         OrderAnalyzeContents order = orderAnalyzeContentRepository.findById(response.getOrderId())
                 .orElseThrow(() -> new RuntimeException("Order not found in order analyze content response queue"));
         if (response.getStatus() == ScrapingStatus.FAILED) {
+            order.setStatus(OrderAnalyzeContentStatus.ANALYZE_CONTENT_FAILED);
+            orderAnalyzeContentRepository.save(order);
             rabbitTemplate.convertAndSend(
             RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE
             , RabbitMqConfig.ORDER_ANALYZE_CONTENT_REFUND_REQUEST_ROUTING_KEY,
@@ -293,6 +324,7 @@ public class PurchaseService {
 
             diagrams.add(diagram);
         }
+        order.setStatus(OrderAnalyzeContentStatus.SUCCEED);
         order.setDiagrams(diagrams);
         orderAnalyzeContentRepository.save(order);
         // before sending for the user saving the video analyze diagram id and also the created video diagram id

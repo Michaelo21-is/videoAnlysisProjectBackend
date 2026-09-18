@@ -15,7 +15,7 @@ from aio_pika.abc import (
 from pydantic import BaseModel
 
 from app.Schemea.AnalyzeVideoSchema import AnalyzeVideoSchema
-from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape
+from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrape, AnalyzeVideoDto
 
 
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
@@ -75,6 +75,10 @@ ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_QUEUE = (
 ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_ROUTING_KEY = (
 "order_analyze_content.scrape_response.routing_key"
 )
+
+ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_QUEUE = "order-analyze-content-user-chose-videos-queue"
+ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_ROUTING_KEY = "order_analyze_content.user_chose_videos.routing_key"
+
 ORDER_ANALYZE_CONTENT_RESPONSE_ROUTING_KEY = (
     "order_analyze_content.response.routing_key"
 )
@@ -90,6 +94,10 @@ AnalyzeVideoHandler = Callable[
 
 AnalyzeContentScrapeHandler = Callable[
     [AnalyzeContentScrape],
+    Awaitable[None],
+]
+AnalyzeContentVideoHandler = Callable[
+    [AnalyzeVideoDto],
     Awaitable[None],
 ]
 
@@ -120,6 +128,9 @@ class RabbitMQManager:
         ) = None
 
         self.analyze_content_response_queue: (
+                AbstractRobustQueue | None
+        ) = None
+        self.order_analyze_content_user_chose_videos_queue: (
                 AbstractRobustQueue | None
         ) = None
 
@@ -233,6 +244,24 @@ class RabbitMQManager:
         )
 
         # =====================================================
+        # Analyze content USER CHOSE VIDEOS
+        #
+        # Purchase Service -> LLM Service
+        # =====================================================
+
+        self.order_analyze_content_user_chose_videos_queue = (
+            await self.channel.declare_queue(
+                name=ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_QUEUE,
+                durable=True,
+            )
+        )
+
+        await self.order_analyze_content_user_chose_videos_queue.bind(
+            exchange=self.order_analyze_content_exchange,
+            routing_key=ORDER_ANALYZE_CONTENT_USER_CHOSE_VIDEOS_ROUTING_KEY,
+        )
+
+        # =====================================================
         # Analyze content SCRAPE RESPONSE
         #
         # LLM Service -> Purchase Service
@@ -320,6 +349,41 @@ class RabbitMQManager:
             on_message
         )
 
+    async def consume_order_analyze_content_user_chose_videos(
+        self,
+        handler: AnalyzeContentVideoHandler,
+    ) -> None:
+
+        if self.order_analyze_content_user_chose_videos_queue is None:
+            raise RuntimeError(
+                "Analyze content user chose videos queue is not initialized"
+            )
+
+        async def on_message(
+            message: AbstractIncomingMessage,
+        ) -> None:
+
+            async with message.process(
+                requeue=False
+            ):
+                payload = json.loads(
+                    message.body.decode("utf-8")
+                )
+
+                analyze_content_video = (
+                    AnalyzeVideoDto.model_validate(
+                        payload
+                    )
+                )
+
+                await handler(
+                    analyze_content_video
+                )
+
+        await self.order_analyze_content_user_chose_videos_queue.consume(
+            on_message
+        )
+
     @staticmethod
     async def publish(
         response: dict[str, Any] | BaseModel,
@@ -365,6 +429,8 @@ class RabbitMQManager:
         self.analyze_video_queue = None
         self.analyze_content_scrape_queue = None
         self.order_analyze_content_scrape_response_queue = None
+        self.analyze_content_response_queue = None
+        self.order_analyze_content_user_chose_videos_queue = None
 
 
 rabbitmq_manager = RabbitMQManager(

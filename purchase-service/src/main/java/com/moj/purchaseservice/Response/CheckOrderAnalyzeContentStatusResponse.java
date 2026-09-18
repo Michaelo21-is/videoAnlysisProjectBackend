@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -17,4 +19,16 @@ public class CheckOrderAnalyzeContentStatusResponse {
     private String niche;
     private Platform platform;
     private Integer totalContent;
+    private List<VideoDetails> analyzedVideo;
+    private List<VideoDetails> createdVideo;
+
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Builder
+    public static class VideoDetails {
+        private String diagramId;
+        private String  videoName;
+    }
 }

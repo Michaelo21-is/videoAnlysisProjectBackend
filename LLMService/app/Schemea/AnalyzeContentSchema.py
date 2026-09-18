@@ -1,3 +1,4 @@
+from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.Schemea.AnalyzeVideoSchema import ScrapingStatus
@@ -103,31 +104,39 @@ class AnalyzeContentScrapeResponse(BaseModel):
 
 class videoDetails(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    video_url: str | None = Field(alias="videoUrl")
-    mp4_link: str | None = Field(alias="videoGeminiUrl")
-    video_name: str | None = Field(alias="videoName")
-    should_save_diagram: bool | None = Field(alias="shouldSaveDiagram")
+
+    video_url: str | None = Field(default=None, alias="videoUrl")
+    mp4_url: str | None = Field(default=None, alias="mp4Url")
+    video_name: str | None = Field(default=None, alias="videoName")
+    should_save_diagram: bool = Field(default=False, alias="shouldSaveDiagram")
+
+
+# Must stay in sync with purchase-service's ChooseVideosAnalyzeContentDto.
 class AnalyzeVideoDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    user_id: UUID = Field(alias="userId")
     order_id: int = Field(alias="orderId")
-    business_context : str | None = Field(alias="businessContext")
-    business_target_audience : str | None = Field(alias="businessTargetAudience")
-    sums_of_content : SumOfContent = Field(alias="sumOfContent")
-    videos_details : list[videoDetails] = Field(alias="videosDetails")
-    platform : AnalyzeContentPlatform = Field(alias="platform")
+    business_context: str | None = Field(default=None, alias="businessContext")
+    business_target_audience: str | None = Field(default=None, alias="businessTargetAudience")
+    sum_of_content: SumOfContent = Field(alias="sumOfContent")
+    videos_details: list[videoDetails] = Field(alias="videos")
+    platform: AnalyzeContentPlatform
 
-class AnalyzeVideoDetails(BaseModel):
-    video_name : str | None = Field(alias="videoName")
-    diagram_id : str | None = Field(alias="diagramId")
 
 class diagramDetails(BaseModel):
-    video_name : str | None = Field(alias="videoName")
-    diagram_id : str | None = Field(alias="diagramId")
+    model_config = ConfigDict(populate_by_name=True)
 
+    video_name: str | None = Field(default=None, alias="videoName")
+    diagram_id: str | None = Field(default=None, alias="diagramId")
+
+
+# Must stay in sync with purchase-service's AnalyzeContentResponseDto.
 class analyzeContentResponse(BaseModel):
-    analyze_video_details: list[diagramDetails] | None= Field(alias="analyzeVideosDiagramIds")
-    create_video_details: list[diagramDetails] | None= Field(alias="createdVideosDiagramIds")
-    order_id: int | None= Field(alias="orderId")
-    status: ScrapingStatus | None = Field(alias="status")
-    message: str | None = Field(alias="message")
+    model_config = ConfigDict(populate_by_name=True)
+
+    analyze_video_details: list[diagramDetails] = Field(default_factory=list, alias="analyzedVideos")
+    create_video_details: list[diagramDetails] = Field(default_factory=list, alias="createdVideos")
+    order_id: int = Field(alias="orderId")
+    status: ScrapingStatus
+    message: str | None = None

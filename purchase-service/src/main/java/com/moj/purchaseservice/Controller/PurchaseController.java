@@ -1,5 +1,6 @@
 package com.moj.purchaseservice.Controller;
 
+import com.moj.purchaseservice.Dto.ChooseVideosAnalyzeContentDto;
 import com.moj.purchaseservice.Dto.OrderAnalyzeContentDto;
 import com.moj.purchaseservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
@@ -70,7 +71,11 @@ public class PurchaseController {
     public SseEmitter getAnalyzeContentStatus(@PathVariable("orderId") Long orderId, @RequestHeader("X-USER-ID") UUID userId) {
         return sseOrderAnalyzeContentService.OrderAnalyzeStatusSSE(orderId, userId);
     }
-    @PostMapping("/order-analyze-video")
+    @PostMapping(value = "/chosen-video-for-analyze-content")
+    public ResponseEntity<?> chooseVideoForAnalyzeContent(@RequestHeader("X-USER-ID") UUID userId, ChooseVideosAnalyzeContentDto chooseVideosAnalyzeContentDto) {
+        purchaseService.handleAnalyzedContentVideoPicked(chooseVideosAnalyzeContentDto, userId);
+        return ResponseEntity.ok().build();
+    }
     public ResponseEntity<?> analyzeVideo(@RequestHeader("X-USER-ID") UUID userId, @ModelAttribute OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
         Long orderId = purchaseService.orderAnalyzeVideo(userId, orderAnalyzeVideoDto);
         return ResponseEntity.accepted().body(orderId);

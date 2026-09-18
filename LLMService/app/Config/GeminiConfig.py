@@ -221,7 +221,7 @@ async def upload_videos_urls_to_gemini(video_details: AnalyzeVideoDto) -> list[d
     for video in video_details.videos_details:
         gemini_url = await asyncio.to_thread(
             upload_video_url_to_gemini,
-            video.mp4_link,
+            video.mp4_url,
             None,
             None,
         )
@@ -229,7 +229,7 @@ async def upload_videos_urls_to_gemini(video_details: AnalyzeVideoDto) -> list[d
         gemini_files.append({
             "videoLink": video.video_url,
             "cloudLink": gemini_url,
-            "shouldSaveDiagram": video.shouldSaveDiagram,
+            "shouldSaveDiagram": video.should_save_diagram,
             "videoName": video.video_name,
         })
 
