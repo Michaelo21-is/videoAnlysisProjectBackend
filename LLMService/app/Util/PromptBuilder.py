@@ -663,6 +663,12 @@ def build_diagram_for_analyze_content_prompt(
         10. Important structural patterns from the source video that should
             be preserved in the new original video.
 
+        Length:
+        - Keep the generated prompt approximately 200-350 words.
+        - Cover the ten points above briefly; do not expand each one into
+          its own paragraph.
+        - The generated prompt is a production brief, not a full script.
+
         Additional rules:
         - If business context is provided, explicitly reflect it near the
           beginning of the generated prompt.
@@ -986,6 +992,10 @@ def create_diagram_based_on_videos_prompt(summaries: list[str], amount_of_videos
         - audio direction when relevant,
         - CTA,
         - useful structural patterns inspired by the analyzed videos.
+
+        Keep each generated prompt approximately 200-350 words.
+        Cover the points above briefly. It is a production brief, not a
+        full script.
 
         ORIGINALITY:
 

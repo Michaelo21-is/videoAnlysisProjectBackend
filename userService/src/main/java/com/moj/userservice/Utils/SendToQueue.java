@@ -14,12 +14,8 @@ public class SendToQueue {
     public SendToQueue(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
     }
-    public void sendOrderAnalyzeContentStatus(Long orderId, OrderStatus status) {
-        OrderAnalyzeContentStatusResponse response =
-                OrderAnalyzeContentStatusResponse.builder()
-                        .orderId(orderId)
-                        .status(status)
-                        .build();
+    public void sendOrderAnalyzeContentStatus(OrderAnalyzeContentStatusResponse response) {
+
 
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.ORDER_ANALYZE_CONTENT_EXCHANGE,

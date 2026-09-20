@@ -7,7 +7,6 @@ import com.moj.purchaseservice.Dto.OrderCreditDto;
 import com.moj.purchaseservice.Response.CheckOrderAnalyzeContentStatusResponse;
 import com.moj.purchaseservice.Response.CheckOrderAnalyzeVideoStatusResponse;
 import com.moj.purchaseservice.Service.*;
-import com.moj.purchaseservice.enums.SumOfContent;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -72,10 +71,11 @@ public class PurchaseController {
         return sseOrderAnalyzeContentService.OrderAnalyzeStatusSSE(orderId, userId);
     }
     @PostMapping(value = "/chosen-video-for-analyze-content")
-    public ResponseEntity<?> chooseVideoForAnalyzeContent(@RequestHeader("X-USER-ID") UUID userId, ChooseVideosAnalyzeContentDto chooseVideosAnalyzeContentDto) {
+    public ResponseEntity<?> chooseVideoForAnalyzeContent(@RequestHeader("X-USER-ID") UUID userId, @RequestBody ChooseVideosAnalyzeContentDto chooseVideosAnalyzeContentDto) {
         purchaseService.handleAnalyzedContentVideoPicked(chooseVideosAnalyzeContentDto, userId);
         return ResponseEntity.ok().build();
     }
+    @PostMapping("/order-analyze-video")
     public ResponseEntity<?> analyzeVideo(@RequestHeader("X-USER-ID") UUID userId, @ModelAttribute OrderAnalyzeVideoDto orderAnalyzeVideoDto) {
         Long orderId = purchaseService.orderAnalyzeVideo(userId, orderAnalyzeVideoDto);
         return ResponseEntity.accepted().body(orderId);

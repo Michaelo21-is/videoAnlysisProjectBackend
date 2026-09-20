@@ -14,6 +14,12 @@ class DiagramCreate(BaseModel):
     arrows: list[DiagramArrow] = Field(default_factory=list)
 
 
+# Gemini's structured output for create_diagram_based_on_videos_prompt, which
+# returns several diagrams under a single "diagrams" key.
+class DiagramCreateListResponse(BaseModel):
+    diagrams: list[DiagramCreate]
+
+
 class DiagramUpdate(BaseModel):
     id: str
 

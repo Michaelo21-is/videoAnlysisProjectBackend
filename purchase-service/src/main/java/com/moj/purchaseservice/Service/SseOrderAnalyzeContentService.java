@@ -2,6 +2,7 @@ package com.moj.purchaseservice.Service;
 
 import com.moj.purchaseservice.Dto.AnalyzeContentResponseDto;
 import com.moj.purchaseservice.Dto.OderAnalyzeContentScrapingDto;
+import com.moj.purchaseservice.Dto.OrderAnalyzeContentStatusDto;
 import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
 import com.moj.purchaseservice.Response.OrderResponse;
@@ -69,7 +70,7 @@ public class SseOrderAnalyzeContentService {
 
         return emitter;
     }
-    public void sendPurchaseStatus(OrderResponse response) {
+    public void sendPurchaseStatus(OrderAnalyzeContentStatusDto response) {
         SseEmitter emitter = emitters.get(response.getOrderId());
         if (emitter == null) {
             return;
@@ -141,7 +142,7 @@ public class SseOrderAnalyzeContentService {
             emitter.send(
                     SseEmitter.event()
                             .id(response.getOrderId().toString())
-                            .name("finish analyzing content")
+                            .name("finish-analyzing-content")
                             .data(response)
             );
 

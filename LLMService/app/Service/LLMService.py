@@ -243,14 +243,17 @@ class LLMService:
         try:
             if videos_details.platform is not AnalyzeContentPlatform.YOUTUBE:
                 current_stage = "uploading videos to gemini"
-                gemini_details = await upload_videos_urls_to_gemini(videos_details)
+                gemini_details = await upload_videos_urls_to_gemini(videos_details, videos_details.platform)
+                logger.info(
+                    "gemini_details: %s",
+                    gemini_details,
+                )
                 current_stage = "analyzing videos"
                 for video in gemini_details:
                     if video["shouldSaveDiagram"]:
                         prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context
                         , videos_details.business_target_audience,videos_details.platform, video["videoName"])
-                        response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video["cloudLink"])
-
+                        response = await asyncio.to_thread(analyze_content_save_diagram,video["cloudLink"],prompt_for_diagram,)
                         current_stage = "saving analyzed video diagram"
                         diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram, response.diagram, videos_details.user_id,)
                         videos_analyzed.append(
@@ -263,7 +266,7 @@ class LLMService:
                     else:
                         prompt = analyze_content_prompt(videos_details.platform)
                         current_stage="analyzing video without creating diagram"
-                        response = await asyncio.to_thread(analyze_content, prompt, video["cloudLink"])
+                        response = await asyncio.to_thread(analyze_content, video["cloudLink"],prompt)
                         summaries.append(response)
             else:
                 current_stage = "analyzing youtube videos"
@@ -272,7 +275,7 @@ class LLMService:
                         prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context, videos_details.business_target_audience,
                         videos_details.platform, video.video_name)
                         current_stage = "analyzing youtube video then save it to diagram"
-                        response = await asyncio.to_thread(analyze_content_save_diagram, prompt_for_diagram, video.video_url)
+                        response = await asyncio.to_thread(analyze_content_save_diagram, video.video_url ,prompt_for_diagram)
                         current_stage = "saving analyzed video diagram"
                         diagram_id =await asyncio.to_thread(self.diagram_service.create_diagram,response.diagram,videos_details.user_id,)
                         videos_analyzed.append(
@@ -285,7 +288,7 @@ class LLMService:
                     else:
                         current_stage = "analyzing youtube video without creating diagram"
                         prompt = analyze_content_prompt(videos_details.platform)
-                        response = await asyncio.to_thread(analyze_content, prompt, video.video_url)
+                        response = await asyncio.to_thread(analyze_content,video.video_url ,prompt )
                         summaries.append(response)
 
             create_video_prompt = create_diagram_based_on_videos_prompt(summaries, videos_details.sum_of_content, videos_details.business_context, videos_details.business_target_audience)

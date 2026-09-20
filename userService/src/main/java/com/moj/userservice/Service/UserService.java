@@ -8,10 +8,7 @@ import com.moj.userservice.Enums.OrderAnalyzeContentStatus;
 import com.moj.userservice.Enums.OrderStatus;
 import com.moj.userservice.Repository.BusinessContextRepository;
 import com.moj.userservice.Repository.UserRepository;
-import com.moj.userservice.Response.OrderAnalyzeContentScrapeResponse;
-import com.moj.userservice.Response.OrderAnalyzeVideoResponse;
-import com.moj.userservice.Response.OrderVideoAnalysisStatusResponse;
-import com.moj.userservice.Response.UserDetailsResponse;
+import com.moj.userservice.Response.*;
 import com.moj.userservice.Utils.SendToQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -131,20 +128,25 @@ public class UserService {
         if (orderAnalyzeContentDto.getUserId() == null || orderAnalyzeContentDto.getCreditCost() == null || orderAnalyzeContentDto.getOrderId() == null) {
             log.info("check the parameters:  userId: {}, creditCost: {}, orderId: {}", orderAnalyzeContentDto.getUserId(), orderAnalyzeContentDto.getCreditCost(), orderAnalyzeContentDto.getOrderId());
             sendToQueue.sendOrderAnalyzeContentStatus(
-                    orderAnalyzeContentDto.getOrderId(),
-                    OrderStatus.SERVER_FAILED
+                    OrderAnalyzeContentStatusResponse.builder()
+                            .orderId(orderAnalyzeContentDto.getOrderId())
+                            .status(OrderStatus.PAYMENT_FAILED)
+                            .build()
             );
             return;
         }
 
         Users user = userRepository.findById(orderAnalyzeContentDto.getUserId())
                 .orElse(null);
-
-        if (user == null) {
-            log.info("User not found in handle order analyze content");
+        BusinessContext business = businessContextRepository.findByUsers_Id(orderAnalyzeContentDto.getUserId())
+                .orElse(null);
+        if (user == null || business == null) {
+            log.info("user or business not found the user:{}, business: {}, user id: {}", user, business, orderAnalyzeContentDto.getUserId());
             sendToQueue.sendOrderAnalyzeContentStatus(
-                    orderAnalyzeContentDto.getOrderId(),
-                    OrderStatus.SERVER_FAILED
+                    OrderAnalyzeContentStatusResponse.builder()
+                            .orderId(orderAnalyzeContentDto.getOrderId())
+                            .status(OrderStatus.PAYMENT_FAILED)
+                            .build()
             );
             return;
         }
@@ -152,8 +154,10 @@ public class UserService {
         if (user.getCreditSum() == 0L || user.getCreditSum() < orderAnalyzeContentDto.getCreditCost()) {
             log.info("User has no enough credit");
             sendToQueue.sendOrderAnalyzeContentStatus(
-                    orderAnalyzeContentDto.getOrderId(),
-                    OrderStatus.PAYMENT_FAILED
+                    OrderAnalyzeContentStatusResponse.builder()
+                            .orderId(orderAnalyzeContentDto.getOrderId())
+                            .status(OrderStatus.PAYMENT_FAILED)
+                            .build()
             );
             return;
         }
@@ -162,15 +166,22 @@ public class UserService {
         if (updatedCreditSum < 0) {
             log.info("Credit sum is less than 0");
             sendToQueue.sendOrderAnalyzeContentStatus(
-                    orderAnalyzeContentDto.getOrderId(),
-                    OrderStatus.PAYMENT_FAILED
+                OrderAnalyzeContentStatusResponse.builder()
+                .orderId(orderAnalyzeContentDto.getOrderId())
+                .status(OrderStatus.PAYMENT_FAILED)
+                .build()
             );
             return;
         }
         user.setCreditSum(updatedCreditSum);
         userRepository.save(user);
 
-        sendToQueue.sendOrderAnalyzeContentStatus(orderAnalyzeContentDto.getOrderId(), OrderStatus.PURCHASED);
+        sendToQueue.sendOrderAnalyzeContentStatus(OrderAnalyzeContentStatusResponse.builder()
+                .orderId(orderAnalyzeContentDto.getOrderId())
+                .status(OrderStatus.PURCHASED)
+                .businessContext(business.getDescription())
+                .targetAudience(business.getTargetAudience())
+                .build());
 
         sendToQueue.sendOrderAnalyzeContentToScrape(OrderAnalyzeContentScrapeResponse.builder()
                 .sumOfContent(orderAnalyzeContentDto.getSumOfContent())

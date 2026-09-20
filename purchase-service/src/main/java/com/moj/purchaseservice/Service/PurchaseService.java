@@ -210,11 +210,7 @@ public class PurchaseService {
         order.setStatus(orderAnalyzeContentStatusDto.getStatus());
         orderAnalyzeContentRepository.save(order);
         if (order.getStatus().equals(OrderAnalyzeContentStatus.PURCHASED)) {
-            sseOrderAnalyzeContentService.sendPurchaseStatus(OrderResponse.builder()
-                    .status(Status.SUCCEED)
-                    .orderId(orderAnalyzeContentStatusDto.getOrderId())
-                    .message("Order analyze content purchased successfully")
-                    .build());
+            sseOrderAnalyzeContentService.sendPurchaseStatus(orderAnalyzeContentStatusDto);
         }
         else{
             order.setStatus(OrderAnalyzeContentStatus.PAYMENT_FAILED);
@@ -224,7 +220,7 @@ public class PurchaseService {
                     .orderId(orderAnalyzeContentStatusDto.getOrderId())
                     .message("Not enough credits in your account")
                     .build());
-        }
+        } 
     }
     @RabbitListener(queues = RabbitMqConfig.ORDER_ANALYZE_CONTENT_SCRAPE_RESPONSE_QUEUE)
     public void analyzeContentScrapeResponse(OderAnalyzeContentScrapingDto orderAnalyzeContentScrapingDto) {

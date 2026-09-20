@@ -2,6 +2,7 @@ from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.Schemea.AnalyzeVideoSchema import ScrapingStatus
+from app.Schemea.DiagramSchema import DiagramCreate
 
 
 class AnalyzeContentPlatform(str, Enum):
@@ -122,6 +123,20 @@ class AnalyzeVideoDto(BaseModel):
     sum_of_content: SumOfContent = Field(alias="sumOfContent")
     videos_details: list[videoDetails] = Field(alias="videos")
     platform: AnalyzeContentPlatform
+
+
+# Gemini's structured output for ONE analyzed video, as described by
+# build_diagram_for_analyze_content_prompt. This is NOT the response published
+# to RabbitMQ - see analyzeContentResponse for that.
+class AnalyzeContentDiagramResponse(BaseModel):
+    diagram: DiagramCreate
+    summary: str
+
+
+# Gemini's structured output for ONE analyzed video that is only summarized,
+# as described by analyze_content_prompt.
+class AnalyzeContentSummaryResponse(BaseModel):
+    summary: str
 
 
 class diagramDetails(BaseModel):

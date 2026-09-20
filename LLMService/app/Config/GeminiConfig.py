@@ -1,21 +1,61 @@
 import asyncio
 import os
 from app.Util.CheckUrlPlatform import UrlPlatform
-import json
 from google import genai
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 import shutil
 import tempfile
 import subprocess
 import time
 from urllib.request import urlopen, Request
 
-from app.Schemea.DiagramSchema import DiagramCreate
-from app.Schemea.AnalyzeContentSchema import AnalyzeVideoDto, analyzeContentResponse
+from app.Schemea.DiagramSchema import DiagramCreate, DiagramCreateListResponse
+from app.Schemea.AnalyzeContentSchema import (AnalyzeVideoDto, AnalyzeContentPlatform,
+    AnalyzeContentDiagramResponse, AnalyzeContentSummaryResponse)
 
 client = genai.Client()
 
-def _send_video_to_gemini(video_url: str, prompt: str) -> str:
+
+# Pydantic leaves a field out of "required" whenever it has a default, so
+# DiagramCreate.nodes/arrows/prompt (default_factory=list, "") come out
+# optional. As a validation contract that is right; as a generation contract
+# it is not - it tells Gemini those fields may be skipped, and the model then
+# returns a diagram with no nodes and no arrows that still validates, because
+# the defaults fill the gap. Structured output has to demand every documented
+# field, so mark the whole schema required.
+#
+# This is only safe while none of the response models have a genuinely
+# optional (`| None`) field; add one and it must be exempted here.
+def _require_all_properties(schema: dict) -> dict:
+    if "properties" in schema:
+        schema["required"] = list(schema["properties"])
+
+    for nested in schema.get("properties", {}).values():
+        _require_all_properties(nested)
+
+    for nested in schema.get("$defs", {}).values():
+        _require_all_properties(nested)
+
+    items = schema.get("items")
+    if isinstance(items, dict):
+        _require_all_properties(items)
+
+    return schema
+
+
+# The prompts describe the expected JSON, but describing it is only a request:
+# Gemini occasionally drops a field (a diagram arrow without "targetNodeId",
+# for example) and the response then fails Pydantic validation. Sending the
+# model's own JSON schema as the structured-output format makes the API
+# constrain decoding instead, so required fields cannot go missing.
+def _json_response_format(response_model: type[BaseModel]) -> dict:
+    return {
+        "type": "text",
+        "mime_type": "application/json",
+        "schema": _require_all_properties(response_model.model_json_schema()),
+    }
+
+def _send_video_to_gemini(video_url: str, prompt: str, response_model: type[BaseModel]) -> str:
     interaction = client.interactions.create(
         model="gemini-3.6-flash",
         input=[
@@ -29,6 +69,7 @@ def _send_video_to_gemini(video_url: str, prompt: str) -> str:
                 "text": prompt,
             },
         ],
+        response_format=_json_response_format(response_model),
         store=False,
     )
 
@@ -40,7 +81,7 @@ def _send_video_to_gemini(video_url: str, prompt: str) -> str:
     return output_text
 
 def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
-    output_text = _send_video_to_gemini(video_url, prompt)
+    output_text = _send_video_to_gemini(video_url, prompt, DiagramCreate)
 
     if not isinstance(output_text, str) or not output_text.strip():
         raise ValueError("Gemini returned an empty response")
@@ -51,21 +92,26 @@ def analyze_video_url( video_url: str, prompt: str, ) -> DiagramCreate:
         raise ValueError(
             "Gemini response does not match DiagramCreate"
         ) from error
-def analyze_content_save_diagram(video_url: str, prompt: str) -> analyzeContentResponse:
-    output_text = _send_video_to_gemini(video_url, prompt)
+def analyze_content_save_diagram(video_url: str, prompt: str) -> AnalyzeContentDiagramResponse:
+    output_text = _send_video_to_gemini(video_url, prompt, AnalyzeContentDiagramResponse)
     if not isinstance(output_text, str) or not output_text.strip():
         raise ValueError("Gemini returned an empty response")
     try:
-        return analyzeContentResponse.model_validate_json(output_text)
+        return AnalyzeContentDiagramResponse.model_validate_json(output_text)
     except ValidationError as error:
         raise ValueError(
-            "Gemini response does not match analyzeContentResponse"
+            "Gemini response does not match AnalyzeContentDiagramResponse"
         ) from error
 def analyze_content(video_url: str, prompt: str) -> str:
-    output_text = _send_video_to_gemini(video_url, prompt)
+    output_text = _send_video_to_gemini(video_url, prompt, AnalyzeContentSummaryResponse)
     if not isinstance(output_text, str) or not output_text.strip():
         raise ValueError("Gemini returned an empty response")
-    return output_text
+    try:
+        return AnalyzeContentSummaryResponse.model_validate_json(output_text).summary
+    except ValidationError as error:
+        raise ValueError(
+            "Gemini response does not match AnalyzeContentSummaryResponse"
+        ) from error
 
 
 def create_diagram_based_on_videos(prompt: str, ) -> list[DiagramCreate]:
@@ -78,6 +124,7 @@ def create_diagram_based_on_videos(prompt: str, ) -> list[DiagramCreate]:
                 "text": prompt,
             }
         ],
+        response_format=_json_response_format(DiagramCreateListResponse),
         store=False,
     )
 
@@ -87,14 +134,9 @@ def create_diagram_based_on_videos(prompt: str, ) -> list[DiagramCreate]:
         raise ValueError("Gemini returned an empty response")
 
     try:
-        data = json.loads(output_text)
+        return DiagramCreateListResponse.model_validate_json(output_text).diagrams
 
-        return [
-            DiagramCreate.model_validate(diagram)
-            for diagram in data["diagrams"]
-        ]
-
-    except (json.JSONDecodeError, KeyError,TypeError, ValidationError,) as error:
+    except ValidationError as error:
         raise ValueError("Gemini response does not match diagrams response") from error
 
 def upload_video_url_to_gemini(video_url: str, audio_url: str | None = None,platform: UrlPlatform | None = None,):
@@ -214,16 +256,16 @@ def upload_video_url_to_gemini(video_url: str, audio_url: str | None = None,plat
                     os.remove(path)
                 except FileNotFoundError:
                     pass
-async def upload_videos_urls_to_gemini(video_details: AnalyzeVideoDto) -> list[dict[str, str | bool]]:
+async def upload_videos_urls_to_gemini(video_details: AnalyzeVideoDto, platform: AnalyzeContentPlatform) -> list[dict[str, str | bool]]:
 
     gemini_files = []
-
+    url_platform = UrlPlatform(platform.value)
     for video in video_details.videos_details:
         gemini_url = await asyncio.to_thread(
             upload_video_url_to_gemini,
             video.mp4_url,
             None,
-            None,
+            platform=url_platform,
         )
 
         gemini_files.append({
