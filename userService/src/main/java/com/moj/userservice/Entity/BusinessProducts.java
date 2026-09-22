@@ -22,7 +22,9 @@ public class BusinessProducts {
 
     private String productDescription;
 
-    private String imageUrl;
+    private String productTargetAudience;
+
+    private String s3ImageKey;
 
     @ManyToOne
     @JoinColumn(name = "users_id", nullable = false)

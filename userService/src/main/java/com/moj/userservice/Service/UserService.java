@@ -3,21 +3,26 @@ package com.moj.userservice.Service;
 import com.moj.userservice.Configuartion.RabbitMqConfig;
 import com.moj.userservice.Dto.*;
 import com.moj.userservice.Entity.BusinessContext;
+import com.moj.userservice.Entity.BusinessProducts;
 import com.moj.userservice.Entity.Users;
 import com.moj.userservice.Enums.OrderAnalyzeContentStatus;
 import com.moj.userservice.Enums.OrderStatus;
 import com.moj.userservice.Repository.BusinessContextRepository;
+import com.moj.userservice.Repository.BusinessProductsRepository;
 import com.moj.userservice.Repository.UserRepository;
 import com.moj.userservice.Response.*;
 import com.moj.userservice.Utils.SendToQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 @Service
@@ -27,12 +32,16 @@ public class UserService {
     private final SendToQueue sendToQueue;
     private final LimitUserRefundService limitUserRefundService;
     private final BusinessContextRepository businessContextRepository;
-    public UserService(UserRepository userRepository,  SendToQueue sendToQueue,
-       LimitUserRefundService limitUserRefundService, BusinessContextRepository businessContextRepository) {
+    private final S3AwsService s3AwsService;
+    private final BusinessProductsRepository businessProductsRepository;
+    public UserService(UserRepository userRepository,  SendToQueue sendToQueue, S3AwsService s3AwsService,
+       LimitUserRefundService limitUserRefundService, BusinessContextRepository businessContextRepository, BusinessProductsRepository businessProductsRepository) {
         this.userRepository = userRepository;
         this.sendToQueue = sendToQueue;
+        this.s3AwsService = s3AwsService;
         this.limitUserRefundService = limitUserRefundService;
         this.businessContextRepository = businessContextRepository;
+        this.businessProductsRepository = businessProductsRepository;
     }
     public UserDetailsResponse getUserDetails(UUID userId) {
         if (userId == null) {
@@ -336,6 +345,34 @@ public class UserService {
     /// product area
     /// ***
     public void addProduct(MultipartFile file, AddProductDto addProductDto, UUID userId) {
+        String key;
+        try {
+            key = s3AwsService.uploadFile(file);
+        }
+        catch (Exception e) {
+            log.error("Failed to upload product image error message \n: {}", e.getMessage());
+            return;
+        }
+        BusinessProducts products = BusinessProducts.builder()
+                .productName(addProductDto.getProductName())
+                .productDescription(addProductDto.getProductDescription())
+                .s3ImageKey(key)
+                .productTargetAudience(addProductDto.getProductTargetAudience())
+                .users(userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")))
+                .build();
+        businessProductsRepository.save(products);
+    }
+    public Page<ProductDetailsResponse> getProductDetailsResponseForProfilePage(UUID userId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
 
+        Page<BusinessProducts> products =
+                businessProductsRepository.findAllByUsers_Id(userId, pageable);
+
+        return products.map(product -> ProductDetailsResponse.builder()
+                .productName(product.getProductName())
+                .productDescription(product.getProductDescription())
+                .productTargetAudience(product.getProductTargetAudience())
+                .s3ImageKey(product.getS3ImageKey())
+                .build());
     }
 }
