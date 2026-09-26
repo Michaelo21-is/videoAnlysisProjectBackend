@@ -45,6 +45,12 @@ public class UserController {
         userService.addProduct(file, addProductDto, userId);
         return ResponseEntity.ok().build();
     }
+    @PutMapping(value = "/update-product", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateProduct(@RequestHeader("X-USER-ID") UUID userId,@RequestParam Long productId ,@RequestPart AddProductDto addProductDto,@RequestPart(value = "file", required = false) MultipartFile file){
+        userService.updateProduct(userId, productId, addProductDto, file);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/get-user-product-details")
     public ResponseEntity<Page<ProductDetailsResponse>> getUserProductDetails(@RequestHeader("X-USER-ID") UUID userId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         Page<ProductDetailsResponse> response = userService.getProductDetailsResponseForProfilePage(userId, page, size);

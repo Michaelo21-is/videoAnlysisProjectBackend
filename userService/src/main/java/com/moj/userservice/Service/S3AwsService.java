@@ -32,10 +32,8 @@ public class S3AwsService {
 
     public String uploadFile(MultipartFile file) {
         try {
-            if (file == null || file.isEmpty()){
-                return null;
-            }
-            else if (file.getSize() > maxFileSize.toBytes()) {
+
+            if (file.getSize() > maxFileSize.toBytes()) {
                 throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "File size exceeds the maximum allowed size");
             }
             else if (!allowedContentTypes.contains(file.getContentType())) {
@@ -70,5 +68,10 @@ public class S3AwsService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload file to S3", e);
         }
+    }
+    public void deleteFile(String key) {
+        s3Client.deleteObject(
+                b -> b.bucket(bucketName).key(key)
+        );
     }
 }

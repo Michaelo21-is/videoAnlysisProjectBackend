@@ -347,13 +347,14 @@ public class UserService {
     /// product area
     /// ***
     public void addProduct(MultipartFile file, AddProductDto addProductDto, UUID userId) {
-        String key;
-        try {
-            key = s3AwsService.uploadFile(file);
-        }
-        catch (Exception e) {
-            log.error("Failed to upload product image error message \n: {}", e.getMessage());
-            return;
+        String key = null;
+        if (file != null && !file.isEmpty()) {
+            try {
+                key = s3AwsService.uploadFile(file);
+            } catch (Exception e) {
+                log.error("Failed to upload product image error message \n: {}", e.getMessage());
+                return;
+            }
         }
         BusinessProducts products = BusinessProducts.builder()
                 .productName(addProductDto.getProductName())
@@ -383,6 +384,47 @@ public class UserService {
         if (!products.getUsers().getId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this product");
         }
+        if (products.getS3ImageKey() != null){
+            s3AwsService.deleteFile(products.getS3ImageKey());
+        }
         businessProductsRepository.deleteById(productId);
+    }
+    public void updateProduct(UUID userId, Long productId, AddProductDto addProductDto, MultipartFile file){
+        BusinessProducts products = businessProductsRepository.findById(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+        if (!products.getUsers().getId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to update this product");
+        }
+        boolean shouldUpdate = false;
+        if (products.getS3ImageKey() != null){
+            s3AwsService.deleteFile(products.getS3ImageKey());
+        }
+        if (addProductDto.getProductName() != null) {
+            products.setProductName(addProductDto.getProductName());
+            shouldUpdate = true;
+        }
+        if (addProductDto.getProductDescription() != null) {
+            products.setProductDescription(addProductDto.getProductDescription());
+            shouldUpdate = true;
+        }
+        if (addProductDto.getProductTargetAudience() != null) {
+            products.setProductTargetAudience(addProductDto.getProductTargetAudience());
+            shouldUpdate = true;
+        }
+        if (file != null && !file.isEmpty()) {
+            String key;
+            try {
+                key = s3AwsService.uploadFile(file);
+            }
+            catch (Exception e) {
+                log.error("Failed to upload product image error message \n: {}", e.getMessage());
+                return;
+            }
+            products.setS3ImageKey(key);
+            shouldUpdate = true;
+        }
+        if (shouldUpdate) {
+            businessProductsRepository.save(products);
+        }
     }
 }
