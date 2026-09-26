@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
@@ -34,6 +34,8 @@ public class UserService {
     private final BusinessContextRepository businessContextRepository;
     private final S3AwsService s3AwsService;
     private final BusinessProductsRepository businessProductsRepository;
+    @Value("${aws.s3.base-url}")
+    private String baseUrl;
     public UserService(UserRepository userRepository,  SendToQueue sendToQueue, S3AwsService s3AwsService,
        LimitUserRefundService limitUserRefundService, BusinessContextRepository businessContextRepository, BusinessProductsRepository businessProductsRepository) {
         this.userRepository = userRepository;
@@ -365,14 +367,22 @@ public class UserService {
     public Page<ProductDetailsResponse> getProductDetailsResponseForProfilePage(UUID userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
 
-        Page<BusinessProducts> products =
-                businessProductsRepository.findAllByUsers_Id(userId, pageable);
+        Page<BusinessProducts> products = businessProductsRepository.findAllByUsers_Id(userId, pageable);
 
         return products.map(product -> ProductDetailsResponse.builder()
+                .id(product.getId())
                 .productName(product.getProductName())
                 .productDescription(product.getProductDescription())
                 .productTargetAudience(product.getProductTargetAudience())
-                .s3ImageKey(product.getS3ImageKey())
+                .s3Url(baseUrl + "/" +product.getS3ImageKey())
                 .build());
+    }
+    public void deleteProduct(UUID userId, Long productId) {
+        BusinessProducts products = businessProductsRepository.findById(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+        if (!products.getUsers().getId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this product");
+        }
+        businessProductsRepository.deleteById(productId);
     }
 }

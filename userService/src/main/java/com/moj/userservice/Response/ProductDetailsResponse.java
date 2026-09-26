@@ -10,8 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class ProductDetailsResponse {
+    private Long id;
     private String productName;
     private String productDescription;
     private String productTargetAudience;
-    private String s3ImageKey;
+    private String s3Url;
 }

@@ -32,13 +32,13 @@ public class S3AwsService {
 
     public String uploadFile(MultipartFile file) {
         try {
-            if (file.isEmpty()){
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty");
+            if (file == null || file.isEmpty()){
+                return null;
             }
-            if (file.getSize() > maxFileSize.toBytes()) {
+            else if (file.getSize() > maxFileSize.toBytes()) {
                 throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "File size exceeds the maximum allowed size");
             }
-            if (!allowedContentTypes.contains(file.getContentType())) {
+            else if (!allowedContentTypes.contains(file.getContentType())) {
                 throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "File type is not allowed");
             }
             String originalFilename = file.getOriginalFilename();
