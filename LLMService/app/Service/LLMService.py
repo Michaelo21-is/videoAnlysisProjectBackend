@@ -251,8 +251,8 @@ class LLMService:
                 current_stage = "analyzing videos"
                 for video in gemini_details:
                     if video["shouldSaveDiagram"]:
-                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context
-                        , videos_details.business_target_audience,videos_details.platform, video["videoName"])
+                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.product_name,
+                        videos_details.product_description, videos_details.product_target_audience, videos_details.platform, video["videoName"])
                         response = await asyncio.to_thread(analyze_content_save_diagram,video["cloudLink"],prompt_for_diagram,)
                         current_stage = "saving analyzed video diagram"
                         diagram_id = await asyncio.to_thread(self.diagram_service.create_diagram, response.diagram, videos_details.user_id,)
@@ -272,8 +272,8 @@ class LLMService:
                 current_stage = "analyzing youtube videos"
                 for video in videos_details.videos_details:
                     if video.should_save_diagram:
-                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.business_context, videos_details.business_target_audience,
-                        videos_details.platform, video.video_name)
+                        prompt_for_diagram = build_diagram_for_analyze_content_prompt(videos_details.product_name,
+                        videos_details.product_description, videos_details.product_target_audience, videos_details.platform, video.video_name)
                         current_stage = "analyzing youtube video then save it to diagram"
                         response = await asyncio.to_thread(analyze_content_save_diagram, video.video_url ,prompt_for_diagram)
                         current_stage = "saving analyzed video diagram"
@@ -291,7 +291,8 @@ class LLMService:
                         response = await asyncio.to_thread(analyze_content,video.video_url ,prompt )
                         summaries.append(response)
 
-            create_video_prompt = create_diagram_based_on_videos_prompt(summaries, videos_details.sum_of_content, videos_details.business_context, videos_details.business_target_audience)
+            create_video_prompt = create_diagram_based_on_videos_prompt(summaries, videos_details.sum_of_content, videos_details.product_name,
+                videos_details.product_description, videos_details.product_target_audience)
             current_stage = "creating diagrams from videos"
             diagrams = await asyncio.to_thread(create_diagram_based_on_videos, create_video_prompt)
             current_stage = "saving created diagrams"

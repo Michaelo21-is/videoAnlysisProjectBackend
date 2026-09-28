@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ProductDetailsResponse {
     private Long id;
+    
     private String productName;
     private String productDescription;
     private String productTargetAudience;

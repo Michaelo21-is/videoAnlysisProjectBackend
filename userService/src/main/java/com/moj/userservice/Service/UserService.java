@@ -191,8 +191,6 @@ public class UserService {
         sendToQueue.sendOrderAnalyzeContentStatus(OrderAnalyzeContentStatusResponse.builder()
                 .orderId(orderAnalyzeContentDto.getOrderId())
                 .status(OrderStatus.PURCHASED)
-                .businessContext(business.getDescription())
-                .targetAudience(business.getTargetAudience())
                 .build());
 
         sendToQueue.sendOrderAnalyzeContentToScrape(OrderAnalyzeContentScrapeResponse.builder()
@@ -365,7 +363,7 @@ public class UserService {
                 .build();
         businessProductsRepository.save(products);
     }
-    public Page<ProductDetailsResponse> getProductDetailsResponseForProfilePage(UUID userId, int page, int size) {
+    public Page<ProductDetailsResponse> getProduct(UUID userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
 
         Page<BusinessProducts> products = businessProductsRepository.findAllByUsers_Id(userId, pageable);
@@ -427,4 +425,5 @@ public class UserService {
             businessProductsRepository.save(products);
         }
     }
+
 }

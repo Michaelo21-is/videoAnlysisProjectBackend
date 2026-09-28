@@ -7,7 +7,6 @@ import com.moj.purchaseservice.Entity.OrderAnalyzeContents;
 import com.moj.purchaseservice.Repository.OrderAnalyzeContentsRepository;
 import com.moj.purchaseservice.Response.OrderResponse;
 import com.moj.purchaseservice.enums.OrderAnalyzeContentStatus;
-import com.moj.purchaseservice.enums.OrderStatus;
 import com.moj.purchaseservice.enums.Status;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;

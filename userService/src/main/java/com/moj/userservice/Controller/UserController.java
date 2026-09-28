@@ -53,7 +53,7 @@ public class UserController {
 
     @GetMapping("/get-user-product-details")
     public ResponseEntity<Page<ProductDetailsResponse>> getUserProductDetails(@RequestHeader("X-USER-ID") UUID userId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
-        Page<ProductDetailsResponse> response = userService.getProductDetailsResponseForProfilePage(userId, page, size);
+        Page<ProductDetailsResponse> response = userService.getProduct(userId, page, size);
         return ResponseEntity.ok(response);
     }
     @DeleteMapping("/delete-product")

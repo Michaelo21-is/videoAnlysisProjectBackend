@@ -14,6 +14,4 @@ import lombok.NoArgsConstructor;
 public class OrderAnalyzeContentStatusResponse {
     private Long orderId;
     private OrderStatus status;
-    private String businessContext;
-    private String targetAudience;
 }

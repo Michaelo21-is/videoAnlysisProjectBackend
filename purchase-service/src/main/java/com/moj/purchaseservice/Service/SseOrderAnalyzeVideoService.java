@@ -3,8 +3,6 @@ package com.moj.purchaseservice.Service;
 import com.moj.purchaseservice.Entity.OrderAnalyzeVideo;
 import com.moj.purchaseservice.Repository.OrderAnalyzeVideoRepository;
 import com.moj.purchaseservice.Response.OrderAnalyzeVideoStatusResponse;
-import com.moj.purchaseservice.Response.OrderResponse;
-import com.moj.purchaseservice.Response.ScrapingCompleteResponse;
 import com.moj.purchaseservice.Response.VideoAnalyzerDiagramResponse;
 import com.moj.purchaseservice.enums.OrderStatus;
 import org.springframework.http.HttpStatus;

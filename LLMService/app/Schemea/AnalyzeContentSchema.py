@@ -118,8 +118,9 @@ class AnalyzeVideoDto(BaseModel):
 
     user_id: UUID = Field(alias="userId")
     order_id: int = Field(alias="orderId")
-    business_context: str | None = Field(default=None, alias="businessContext")
-    business_target_audience: str | None = Field(default=None, alias="businessTargetAudience")
+    product_name: str = Field(alias="productName")
+    product_description: str = Field(alias="productDescription")
+    product_target_audience: str = Field(alias="productTargetAudience")
     sum_of_content: SumOfContent = Field(alias="sumOfContent")
     videos_details: list[videoDetails] = Field(alias="videos")
     platform: AnalyzeContentPlatform
