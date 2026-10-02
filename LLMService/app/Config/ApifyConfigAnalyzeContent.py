@@ -1,5 +1,6 @@
 from apify_client import ApifyClient
 import os
+import re
 from app.Util.ExtractVideoDetailsFromApify import (extractedVideoDetailsFromTiktok
 , extractedVideoDetailsFromInstagram, extractedVideoDetailsFromX, extractedVideoDetailsFromFacebook,
    extractedVideoDetailsFromYoutube)
@@ -72,27 +73,49 @@ def search_tiktok_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
     return videos
 
 
-def search_instagram_videos(queries: list[str]) -> list[ExtractedVideoDetails]:
+def search_instagram_videos(
+    queries: list[str],
+) -> list[ExtractedVideoDetails]:
+
     run_input = {
         "resultsType": "reels",
-        "directUrls": None,
-
-        "search": queries,
+        "search": ", ".join(queries),
         "searchType": "hashtag",
         "searchLimit": 10,
-
+        "resultsLimit": 5,
         "addParentData": False,
     }
-    run = client.actor("shu8hvrXbJbY3Eb9W").call(run_input=run_input)
-    videos = []
 
-    for item in client.dataset(run.default_dataset_id).iterate_items():
+    run = client.actor("shu8hvrXbJbY3Eb9W").call(
+        run_input=run_input,
+    )
+
+    if run is None:
+        raise RuntimeError("Instagram scraper failed")
+
+    videos = []
+    seen_ids = set()
+
+    for item in client.dataset(
+        run.default_dataset_id
+    ).iterate_items():
+
+        print("INSTAGRAM ITEM:", item)
+
         if item.get("error"):
             continue
 
-        video_details = extractedVideoDetailsFromInstagram(item)
+        video_id = item.get("id") or item.get("shortCode")
 
-        videos.append(video_details)
+        if video_id:
+            if video_id in seen_ids:
+                continue
+
+            seen_ids.add(video_id)
+
+        videos.append(
+            extractedVideoDetailsFromInstagram(item)
+        )
 
     return videos
 

@@ -55,7 +55,7 @@ def extractedVideoDetailsFromInstagram(item: dict) -> ExtractedVideoDetails:
         # Direct MP4 URL
         mp4Url=item.get("videoUrl"),
 
-        views=item.get("videoPlayCount") or 0,
+        views=item.get("videoPlayCount") or item.get("videoViewCount") or 0,
         likes=item.get("likesCount") or 0,
         comments=item.get("commentsCount") or 0,
         shares=item.get("reshareCount") or 0,

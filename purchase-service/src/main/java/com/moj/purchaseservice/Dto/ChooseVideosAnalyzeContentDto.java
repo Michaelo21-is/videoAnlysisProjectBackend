@@ -15,7 +15,7 @@ import java.util.UUID;
 public class ChooseVideosAnalyzeContentDto {
     private Long orderId;
     private UUID userId;
-    private String ProductName;
+    private String productName;
     private String productDescription;
     private String productTargetAudience;
     private SumOfContent sumOfContent;

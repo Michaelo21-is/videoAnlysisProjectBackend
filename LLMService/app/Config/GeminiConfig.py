@@ -261,6 +261,13 @@ async def upload_videos_urls_to_gemini(video_details: AnalyzeVideoDto, platform:
     gemini_files = []
     url_platform = UrlPlatform(platform.value)
     for video in video_details.videos_details:
+        if not video.mp4_url:
+            raise ValueError(
+                f"Missing mp4Url for video. "
+                f"videoUrl={video.video_url}, "
+                f"videoName={video.video_name}, "
+                f"platform={platform.value}"
+            )
         gemini_url = await asyncio.to_thread(
             upload_video_url_to_gemini,
             video.mp4_url,

@@ -1,6 +1,6 @@
 from apify_client import ApifyClient
 import os
-from app.Schemea.AnalyzeContentSchema import AnalyzeContentScrapeResponse, ExtractedVideoDetails
+from app.Schemea.AnalyzeContentSchema import  ExtractedVideoDetails
 
 api_key = os.environ["APIFY_API"]
 client = ApifyClient(api_key)

@@ -11,7 +11,7 @@ def select_top_relevant_videos(videos: list[ExtractedVideoDetails],limit: int = 
     valid_videos = [
         video
         for video in videos
-        if video.url
+        if video.url and video.mp4Url is not None
     ]
 
     if len(valid_videos) <= limit:
@@ -101,6 +101,7 @@ def _normalize(
 
 def _safe_number(value) -> float:
     try:
-        return float(value or 0)
+        number = float(value or 0)
+        return max(number, 0)
     except (TypeError, ValueError):
         return 0
