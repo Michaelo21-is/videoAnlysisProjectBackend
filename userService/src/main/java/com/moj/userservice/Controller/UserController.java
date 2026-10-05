@@ -1,10 +1,13 @@
 package com.moj.userservice.Controller;
 
+import com.moj.userservice.Dto.AddAvatarDto;
 import com.moj.userservice.Dto.AddProductDto;
 import com.moj.userservice.Dto.BusinessDetailsDto;
+import com.moj.userservice.Dto.UpdateAvatarDto;
 import com.moj.userservice.Response.ProductDetailsResponse;
 import com.moj.userservice.Response.UserDetailsResponse;
 import com.moj.userservice.Service.UserService;
+import org.apache.coyote.Response;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -61,4 +64,25 @@ public class UserController {
         userService.deleteProduct(userId, productId);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping(value = "/add-avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> addProduct(@RequestHeader("X-USER-ID") UUID userId, @RequestPart MultipartFile file, @RequestPart AddAvatarDto addAvatarDto){
+        userService.addAvatar(file, addAvatarDto, userId);
+        return ResponseEntity.ok().build();
+    }
+    @PutMapping(value = "/update-avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateProduct(@RequestHeader("X-USER-ID") UUID userId, @RequestPart MultipartFile file, @RequestPart UpdateAvatarDto updateAvatarDto){
+        userService.updateAvatar(userId, updateAvatarDto, file);
+        return ResponseEntity.ok().build();
+    }
+    @DeleteMapping("/delete-avatar")
+    public ResponseEntity<?> deleteAvatar(@RequestHeader("X-USER-ID") UUID userId, @RequestParam Long avatarId){
+        userService.deleteAvatar(userId, avatarId);
+        return ResponseEntity.ok().build();
+    }
+    @GetMapping("/get-avatars")
+    public ResponseEntity<?>getAvatars(@RequestHeader("X-USER-ID") UUID userId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "5") int size){
+        return ResponseEntity.ok(userService.getAvatars(userId, page, size));
+    }
+
 }

@@ -2,11 +2,13 @@ package com.moj.userservice.Service;
 
 import com.moj.userservice.Configuartion.RabbitMqConfig;
 import com.moj.userservice.Dto.*;
+import com.moj.userservice.Entity.BusinessAvatar;
 import com.moj.userservice.Entity.BusinessContext;
 import com.moj.userservice.Entity.BusinessProducts;
 import com.moj.userservice.Entity.Users;
 import com.moj.userservice.Enums.OrderAnalyzeContentStatus;
 import com.moj.userservice.Enums.OrderStatus;
+import com.moj.userservice.Repository.BusinessAvatarRepository;
 import com.moj.userservice.Repository.BusinessContextRepository;
 import com.moj.userservice.Repository.BusinessProductsRepository;
 import com.moj.userservice.Repository.UserRepository;
@@ -23,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
+
 import java.util.UUID;
 
 @Service
@@ -34,16 +37,19 @@ public class UserService {
     private final BusinessContextRepository businessContextRepository;
     private final S3AwsService s3AwsService;
     private final BusinessProductsRepository businessProductsRepository;
+    private final BusinessAvatarRepository businessAvatarRepository;
     @Value("${aws.s3.base-url}")
     private String baseUrl;
     public UserService(UserRepository userRepository,  SendToQueue sendToQueue, S3AwsService s3AwsService,
-       LimitUserRefundService limitUserRefundService, BusinessContextRepository businessContextRepository, BusinessProductsRepository businessProductsRepository) {
+       LimitUserRefundService limitUserRefundService, BusinessContextRepository businessContextRepository
+            , BusinessProductsRepository businessProductsRepository, BusinessAvatarRepository businessAvatarRepository) {
         this.userRepository = userRepository;
         this.sendToQueue = sendToQueue;
         this.s3AwsService = s3AwsService;
         this.limitUserRefundService = limitUserRefundService;
         this.businessContextRepository = businessContextRepository;
         this.businessProductsRepository = businessProductsRepository;
+        this.businessAvatarRepository = businessAvatarRepository;
     }
     public UserDetailsResponse getUserDetails(UUID userId) {
         if (userId == null) {
@@ -425,5 +431,82 @@ public class UserService {
             businessProductsRepository.save(products);
         }
     }
+    /// ***
+    /// product area
+    /// ***
+
+
+    /// ***
+    /// avatar area
+    /// ***
+
+    public void addAvatar(MultipartFile file, AddAvatarDto addAvatarDto, UUID userId) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "need to upload an image to add avatar");
+        }
+        String awsKey = s3AwsService.uploadFile(file);
+        BusinessAvatar businessAvatar = BusinessAvatar.builder()
+                .avatarDescription(addAvatarDto.getAvatarDescription())
+                .avatarName(addAvatarDto.getAvatarName())
+                .s3ImageKey(awsKey)
+                .users(userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")))
+                .build();
+        businessAvatarRepository.save(businessAvatar);
+    }
+
+    public void updateAvatar(UUID userId, UpdateAvatarDto updateAvatarDto, MultipartFile file) {
+        BusinessAvatar businessAvatar = businessAvatarRepository.findById(updateAvatarDto.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Avatar not found"));
+        if (!businessAvatar.getUsers().getId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to update this avatar");
+        }
+        boolean shouldUpdate = false;
+        if (updateAvatarDto.getAvatarName() != null) {
+            businessAvatar.setAvatarName(updateAvatarDto.getAvatarName());
+            shouldUpdate = true;
+        }
+        if (updateAvatarDto.getAvatarDescription() != null) {
+            businessAvatar.setAvatarDescription(updateAvatarDto.getAvatarDescription());
+            shouldUpdate = true;
+        }
+        if (file != null && !file.isEmpty()) {
+            String awsKey;
+            try {
+                awsKey = s3AwsService.uploadFile(file);
+                businessAvatar.setS3ImageKey(awsKey);
+                shouldUpdate = true;
+            }
+            catch (Exception e) {
+                log.error("Failed to upload avatar image error message \n: {}", e.getMessage());
+                return;
+            }
+        }
+        if (shouldUpdate) {
+            businessAvatarRepository.save(businessAvatar);
+        }
+    }
+    public void deleteAvatar(UUID userId, Long avatarId) {
+        BusinessAvatar businessAvatar = businessAvatarRepository.findById(avatarId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Avatar not found"));
+        if (!businessAvatar.getUsers().getId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this avatar");
+        }
+        s3AwsService.deleteFile(businessAvatar.getS3ImageKey());
+        businessAvatarRepository.deleteById(avatarId);
+    }
+
+    public Page<AvatarResponse> getAvatars(UUID userId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<BusinessAvatar> avatars  = businessAvatarRepository.findAllByUsers_Id(userId, pageable);
+        return avatars.map(avatar -> AvatarResponse.builder()
+                .id(avatar.getId())
+                .avatarName(avatar.getAvatarName())
+                .avatarDescription(avatar.getAvatarDescription())
+                .s3Url(baseUrl + "/" + avatar.getS3ImageKey())
+                .build());
+    }
+    /// ***
+    /// avatar area
+    /// ***
 
 }
