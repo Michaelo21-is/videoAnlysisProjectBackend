@@ -40,10 +40,13 @@ class AnalyzeVideoSchema(BaseModel):
 
 class AnalyzeVideoResponse(BaseModel):
     diagram_id: str | None = None
+    diagram_name: str | None = None
     order_id: int
     message: str
     status: AnalyzeVideoStatus
     video_gemini_url: str | None = None
+    prompt: str | None = None
+
 class scraping_complete_response(BaseModel):
     order_id: int
     message: str

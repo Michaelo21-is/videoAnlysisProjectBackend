@@ -4,6 +4,7 @@ import com.moj.userservice.Dto.AddAvatarDto;
 import com.moj.userservice.Dto.AddProductDto;
 import com.moj.userservice.Dto.BusinessDetailsDto;
 import com.moj.userservice.Dto.UpdateAvatarDto;
+import com.moj.userservice.Response.AvatarResponse;
 import com.moj.userservice.Response.ProductDetailsResponse;
 import com.moj.userservice.Response.UserDetailsResponse;
 import com.moj.userservice.Service.UserService;
@@ -81,8 +82,7 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
     @GetMapping("/get-avatars")
-    public ResponseEntity<?>getAvatars(@RequestHeader("X-USER-ID") UUID userId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "5") int size){
+    public ResponseEntity<Page<AvatarResponse>>getAvatars(@RequestHeader("X-USER-ID") UUID userId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "5") int size){
         return ResponseEntity.ok(userService.getAvatars(userId, page, size));
     }
-
 }

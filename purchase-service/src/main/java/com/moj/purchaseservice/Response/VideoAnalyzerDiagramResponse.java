@@ -20,10 +20,17 @@ public class VideoAnalyzerDiagramResponse {
     @JsonProperty("diagram_id")
     private String diagramId;
 
+    @JsonProperty("diagram_name")
+    private String diagramName;
+
     private String message;
 
     private OrderStatus status;
 
     @JsonProperty("video_gemini_url")
     private String videoGeminiUrl;
+
+    // read from the LLM service message only, never sent back to the client over SSE
+    @JsonProperty(value = "prompt", access = JsonProperty.Access.WRITE_ONLY)
+    private String prompt;
 }

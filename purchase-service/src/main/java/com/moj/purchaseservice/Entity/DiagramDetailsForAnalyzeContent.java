@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
@@ -30,8 +32,14 @@ public class DiagramDetailsForAnalyzeContent {
     @Column(name = "video_name", nullable = false)
     private String videoName;
 
+    @Column(name = "prompt", columnDefinition = "TEXT")
+    private String prompt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "diagram_type", nullable = false)
     private VideoDiagramType videoDiagramType;
+
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
 }

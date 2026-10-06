@@ -18,6 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -305,6 +308,7 @@ public class PurchaseService {
             diagram.setDiagramId(videoDetails.getDiagramId());
             diagram.setVideoName(videoDetails.getVideoName());
             diagram.setVideoDiagramType(VideoDiagramType.GENERATED_VIDEO);
+            diagram.setPrompt(videoDetails.getPrompt());
 
             diagrams.add(diagram);
         }
@@ -317,7 +321,8 @@ public class PurchaseService {
             diagram.setDiagramId(videoDetails.getDiagramId());
             diagram.setVideoName(videoDetails.getVideoName());
             diagram.setVideoDiagramType(VideoDiagramType.ANALYZED_VIDEO);
-
+            diagram.setUserId(order.getUserId());
+            diagram.setPrompt(videoDetails.getPrompt());
             diagrams.add(diagram);
         }
         order.setStatus(OrderAnalyzeContentStatus.SUCCEED);
@@ -830,6 +835,29 @@ public class PurchaseService {
                     videoAnalyzerDiagramResponse.getDiagramId()
             );
 
+            try {
+                DiagramDetailsForAnalyzeContent diagram =
+                        new DiagramDetailsForAnalyzeContent();
+
+                diagram.setDiagramId(videoAnalyzerDiagramResponse.getDiagramId());
+                diagram.setVideoName(
+                        videoAnalyzerDiagramResponse.getDiagramName() != null
+                                && !videoAnalyzerDiagramResponse.getDiagramName().isBlank()
+                                ? videoAnalyzerDiagramResponse.getDiagramName()
+                                : "Analyzed video"
+                );
+                diagram.setVideoDiagramType(VideoDiagramType.ANALYZED_VIDEO);
+                diagram.setUserId(order.getUserId());
+                diagram.setPrompt(videoAnalyzerDiagramResponse.getPrompt());
+                diagramDetailsForAnalyzeContentRepository.save(diagram);
+            } catch (Exception e) {
+                log.error(
+                        "Failed to save diagram details for analyze video order {}",
+                        order.getId(),
+                        e
+                );
+            }
+
         }
         orderAnalyzeVideoRepository.save(order);
         sseOrderAnalyzeVideoService
@@ -853,5 +881,17 @@ public class PurchaseService {
                 );
             }
         }
+    }
+
+    public Page<DiagramDetailsResponse> getDiagramsDetails(Integer page, Integer size, UUID userId) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<DiagramDetailsForAnalyzeContent> diagramDetails = diagramDetailsForAnalyzeContentRepository.findAllByUserId(userId, pageable);
+        return diagramDetails.map(diagram ->
+                DiagramDetailsResponse.builder()
+                        .diagramId(diagram.getDiagramId())
+                        .prompt(diagram.getPrompt())
+                        .videoName(diagram.getVideoName())
+                        .build()
+        );
     }
 }

@@ -6,11 +6,13 @@ import com.moj.purchaseservice.Dto.OrderAnalyzeVideoDto;
 import com.moj.purchaseservice.Dto.OrderCreditDto;
 import com.moj.purchaseservice.Response.CheckOrderAnalyzeContentStatusResponse;
 import com.moj.purchaseservice.Response.CheckOrderAnalyzeVideoStatusResponse;
+import com.moj.purchaseservice.Response.DiagramDetailsResponse;
 import com.moj.purchaseservice.Service.*;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.data.domain.Page;
 
 import java.util.UUID;
 
@@ -90,4 +92,8 @@ public class PurchaseController {
         return sseOrderAnalyzeVideoService.OrderAnalyzeStatusSSE(orderId, userId);
     }
 
+    @GetMapping("/create-video/diagrams")
+    public ResponseEntity<Page<DiagramDetailsResponse> > getDiagrams(@RequestParam(value = "page", defaultValue = "0") Integer page, @RequestParam(value = "size", defaultValue = "5") Integer size, @RequestHeader("X-USER-ID") UUID userId) {
+        return ResponseEntity.ok(purchaseService.getDiagramsDetails(page, size, userId));
+    }
 }

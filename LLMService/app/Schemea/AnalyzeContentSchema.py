@@ -145,6 +145,7 @@ class diagramDetails(BaseModel):
 
     video_name: str | None = Field(default=None, alias="videoName")
     diagram_id: str | None = Field(default=None, alias="diagramId")
+    prompt: str | None = None
 
 
 # Must stay in sync with purchase-service's AnalyzeContentResponseDto.

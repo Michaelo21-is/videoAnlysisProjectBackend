@@ -259,6 +259,7 @@ class LLMService:
                             diagramDetails(
                                 videoName=video["videoName"],
                                 diagramId=diagram_id,
+                                prompt=prompt_for_diagram,
                             )
                         )
                         summaries.append(response.summary)
@@ -281,6 +282,7 @@ class LLMService:
                             diagramDetails(
                                 videoName=video.video_name,
                                 diagramId=diagram_id,
+                                prompt=prompt_for_diagram,
                             )
                         )
                         summaries.append(response.summary)
@@ -301,6 +303,7 @@ class LLMService:
                     diagramDetails(
                         videoName=diagram.name,
                         diagramId=video_created_diagram_id,
+                        prompt=create_video_prompt,
                     )
                 )
             response = analyzeContentResponse(
@@ -499,6 +502,8 @@ class LLMService:
                 message="Video analyzed successfully",
                 order_id=analyze_video_schema.order_id,
                 diagram_id=diagram_id,
+                diagram_name=diagram_create.name,
+                prompt=prompt,
                 video_gemini_url=gemini_url,
             )
 
@@ -551,6 +556,8 @@ class LLMService:
                 message="Video analyzed successfully",
                 order_id=analyze_video_schema.order_id,
                 diagram_id=diagram_id,
+                diagram_name=diagram_create.name,
+                prompt=prompt,
                 video_gemini_url=analyze_video_schema.video_gemini_url,
             )
 

@@ -1,5 +1,6 @@
 package com.moj.purchaseservice.Dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.moj.purchaseservice.enums.ScrapingStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -25,5 +26,9 @@ public class AnalyzeContentResponseDto {
     public static class VideoDetails {
         private String diagramId;
         private String videoName;
+
+        // read from the LLM service message only, never sent back to the client over SSE
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+        private String prompt;
     }
 }
